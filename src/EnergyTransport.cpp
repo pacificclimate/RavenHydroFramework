@@ -361,19 +361,15 @@ void   CEnthalpyModel::RouteMassInReservoir   (const int          p,          //
   double tstep=Options.timestep; 
   
   
-  double Q_dn_new(0),Q_up_new(0);
-  double Q_dn_old = 0.0;
-  double Q_up_old = 0.0;
-  
-  double Q_vert = (V_h_new - V_h_old)/tstep;
-  if (Q_vert > 0){
-	  Q_dn_new = Q_vert; Q_up_new = 0.0;
-  }
-  else
-  {
-	  Q_dn_new = 0.0; Q_up_new = -Q_vert;
-  }
-  
+//  double Q_dn_new(0),Q_up_new(0),Q_dn_old(0),Q_up_old(0),Q_vert;
+  double Q_dn_new(0),Q_dn_old(0),Q_up_new(0),Q_up_old(0);
+
+  double Q_vert = (V_h_new - V_h_old)/tstep;	  
+  if (Q_vert> 0){
+	        Q_dn_new = Q_vert; Q_up_new = 0.0;
+	}else{
+			Q_dn_new = 0; Q_up_new = -Q_vert;
+		}
 
   CHydroUnit*   pHRU=_pModel->GetHydroUnit(pRes->GetHRUIndex());
   double Acorr=1.0;
@@ -585,6 +581,12 @@ void   CEnthalpyModel::RouteMassInReservoir   (const int          p,          //
   }
   Res_mass  =E_guess;
   ResSedMass=Es_guess;
+  
+  double _Q_dn_old = Q_dn_new;
+  double _Q_up_old = Q_up_new;
+  
+  cout<<"_Q_dn_old = "<<_Q_dn_old<<"\n";
+  cout<<"_Q_up_old = "<<_Q_up_old<<"\n";
 
   delete [] B;
   delete [] R;

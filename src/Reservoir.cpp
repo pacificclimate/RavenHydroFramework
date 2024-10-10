@@ -18,6 +18,8 @@ void CReservoir::BaseConstructor(const string Name,const long SubID)
   _SBID=SubID;
 
   _pDownSB=NULL;
+  _Q_dn_old = 0.0;
+  _Q_up_old = 0.0;
   _mixing_depth=5.0;
   _lakebed_thick=1.0;
   _lakebed_cond =0.0;
