@@ -206,6 +206,7 @@ public:/*-------------------------------------------------------*/
   double            GetMinStage              (const int nn) const;//[m]
   double            GetMaxStage              (const int nn) const;//[m]
   double            GetSillElevation         (const int nn) const;//[m]
+  double            GetMixingDepth           () const; //[m]
 
   int               GetNumWaterDemands       () const;
   CDemand          *GetWaterDemandObj        (const int ii) const;

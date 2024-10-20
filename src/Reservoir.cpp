@@ -20,7 +20,7 @@ void CReservoir::BaseConstructor(const string Name,const long SubID)
   _pDownSB=NULL;
   _Q_dn_old = 0.0;
   _Q_up_old = 0.0;
-  _mixing_depth=5.0;
+  _mixing_depth=15.0;
   _lakebed_thick=1.0;
   _lakebed_cond =0.0;
   _lake_convcoeff=2.0;
@@ -449,6 +449,11 @@ double  CReservoir::GetSillElevation(const int nn) const
   }
   return _crest_ht+weir_adj;
 }
+//////////////////////////////////////////////////////////////////
+/// \returns mixing depth [m]
+//
+double  CReservoir::GetMixingDepth        () const { return _mixing_depth; }
+
 //////////////////////////////////////////////////////////////////
 /// \returns current surface area [m2]
 //
