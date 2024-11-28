@@ -11,14 +11,16 @@
 /// \param SubID [in] subbasin ID
 /// \param typ [in] reservoir type
 /// \details needed because versions of c++ prior to v11 don't necessaarily support delegating constructors
-//
+//  
 void CReservoir::BaseConstructor(const string Name,const long SubID)
 {
   _name=Name;
   _SBID=SubID;
 
   _pDownSB=NULL;
-
+  _Q_dn_old = 0.0;
+  _Q_up_old = 0.0;
+  _mixing_depth=0.0;
   _lakebed_thick=1.0;
   _lakebed_cond =0.0;
   _lake_convcoeff=2.0;
@@ -30,7 +32,7 @@ void CReservoir::BaseConstructor(const string Name,const long SubID)
   _Qout      =0.0;
   _Qout_last =0.0;
   _MB_losses =0.0;
-  _AET		   =0.0;
+  _AET       =0.0;
   _Precip    =0.0;
   _GW_seepage=0.0;
   _aQstruct=NULL;
@@ -85,6 +87,7 @@ void CReservoir::BaseConstructor(const string Name,const long SubID)
 
   _nControlStructures=0;
   _pControlStructures=NULL;
+  
 
   _seepage_const=0;
   _local_GW_head=0.0;
@@ -117,15 +120,17 @@ CReservoir::CReservoir(const string Name,const long SubID)
 /// \param b_V [in] power law exponent for volume rating curve [-]
 /// \param a_Q [in] power law coefficient for discharge rating curve [m3/s*m^-b_Q]
 /// \param b_Q [in] power law exponent for discharge rating curve [-]
-/// \param a_A[in] surface area of reservoir/lake when stage at absolute crest height [m2]
+/// \param a_A [in] surface area of reservoir/lake when stage at absolute crest height [m2]
 /// \param b_A [in] power law exponent for area rating curve [-] (0 for prismatic reservoir)
 
 //
+ 
 CReservoir::CReservoir(const string Name, const long SBID,
                        const double a_V,  const double b_V,
                        const double a_Q,  const double b_Q,
                        const double a_A,  const double b_A,
-                       const double crestht,const double depth)
+                       const double crestht,const double depth,
+                       const CModelABC* pModel)
 {
   BaseConstructor(Name,SBID);
 
@@ -139,6 +144,10 @@ CReservoir::CReservoir(const string Name, const long SBID,
 
   double aA=a_A;
   double bA=b_A;
+
+  double COEFF_RER_A =  pModel->GetGlobalParams()->GetParams()->mix_depth_coef;
+  double COEFF_RER_B =  pModel->GetGlobalParams()->GetParams()->mix_depth_expn;
+
   if(aA==AUTO_COMPUTE) {aA=a_V/depth*b_V;}
   if(bA==AUTO_COMPUTE) {bA=b_V-1.0;      }
 
@@ -147,6 +156,7 @@ CReservoir::CReservoir(const string Name, const long SBID,
   _min_stage =_crest_ht-depth;
   _max_stage =_crest_ht+6.0; // a postive value relative to _crest_ht
   dh=(_max_stage-_min_stage)/(double)(_Np-1);
+  _mixing_depth = COEFF_RER_A*pow(sqrt(aA),COEFF_RER_B);
 
   for(int i=0;i<_Np;i++)
   {
@@ -167,13 +177,13 @@ CReservoir::CReservoir(const string Name, const long SBID,
 /// \param SubID [in] subbasin ID
 /// \param a_ht[] [in] array of reservoir stages [size: nPoints]
 /// \param a_Q[] [in] array of reservoir discharges [size: nPoints]
-/// \param a_A[] [in] array of reservoir volumes [size: nPoints]
-/// \param a_V[] [in] array of reservoir areas [size: nPoints]
+/// \param a_A[] [in] array of reservoir areas [size: nPoints]
+/// \param a_V[] [in] array of reservoir volumes [size: nPoints]
 //
 CReservoir::CReservoir(const string Name, const long SubID,
                        const double *a_ht,
                        const double *a_Q, const double *a_Qund,const double *a_A, const double *a_V,
-                       const int     nPoints)
+                       const int     nPoints,const CModelABC* pModel)
 {
    BaseConstructor(Name,SubID);
 
@@ -189,6 +199,8 @@ CReservoir::CReservoir(const string Name, const long SubID,
   _aArea  =new double [_Np];
   _aVolume=new double [_Np];
   ExitGracefullyIf(_aVolume==NULL,"CReservoir::constructor (2)",OUT_OF_MEMORY);
+  double COEFF_RER_A =  pModel->GetGlobalParams()->GetParams()->mix_depth_coef;
+  double COEFF_RER_B =  pModel->GetGlobalParams()->GetParams()->mix_depth_expn;
 
   string warn;
   for (int i=0;i<_Np;i++)
@@ -223,6 +235,7 @@ CReservoir::CReservoir(const string Name, const long SubID,
     }
   }
   _max_capacity=_aVolume[_Np-1];
+  _mixing_depth = COEFF_RER_A*pow(sqrt(_aArea[_Np-1]),COEFF_RER_B);
 }
 
 //////////////////////////////////////////////////////////////////
@@ -243,7 +256,8 @@ CReservoir::CReservoir(const string Name, const long SubID,
                        const double *a_Qund,
                        const double *a_A,
                        const double *a_V,
-                       const int     nPoints)
+                       const int     nPoints,
+                       const CModelABC* pModel)
 {
   BaseConstructor(Name,SubID);
 
@@ -267,6 +281,9 @@ CReservoir::CReservoir(const string Name, const long SubID,
   for (int v = 0; v<_nDates; v++){ _aQ_back[v] = new double[_Np]; }
   _aVolume=new double [_Np];
   ExitGracefullyIf(_aVolume==NULL,"CReservoir::constructor (2)",OUT_OF_MEMORY);
+
+  double COEFF_RER_A =  pModel->GetGlobalParams()->GetParams()->mix_depth_coef;
+  double COEFF_RER_B =  pModel->GetGlobalParams()->GetParams()->mix_depth_expn;
 
   string warn;
   for (int i=0;i<_Np;i++)
@@ -300,6 +317,7 @@ CReservoir::CReservoir(const string Name, const long SubID,
     }
   }
   _max_capacity=_aVolume[_Np-1];
+  _mixing_depth = COEFF_RER_A*pow(sqrt(_aArea[_Np-1]),COEFF_RER_B);
 }
 //////////////////////////////////////////////////////////////////
 /// \brief Constructor for prismatic lake reservoir controlled by weir coefficient
@@ -316,7 +334,8 @@ CReservoir::CReservoir(const string Name,
                        const double crestw,
                        const double crestht,
                        const double A,
-                       const double depth)
+                       const double depth,
+                       const CModelABC* pModel)
 {
    BaseConstructor(Name,SubID);
 
@@ -338,7 +357,10 @@ CReservoir::CReservoir(const string Name,
   _aArea  =new double [_Np];
   _aVolume=new double [_Np];
   ExitGracefullyIf(_aVolume==NULL,"CReservoir::constructor (4)",OUT_OF_MEMORY);
-
+  
+  double COEFF_RER_A =  pModel->GetGlobalParams()->GetParams()->mix_depth_coef;
+  double COEFF_RER_B =  pModel->GetGlobalParams()->GetParams()->mix_depth_expn;
+  
   double dh;
   string warn;
   dh=(_max_stage-_crest_ht)/(_Np-2); //spacing = 0.05m
@@ -346,6 +368,7 @@ CReservoir::CReservoir(const string Name,
   _aQ     [0]=0.0;
   _aQunder[0]=0.0;
   _aArea  [0]=A;
+
   _aVolume[0]=0.0;
   for (int i=1;i<_Np;i++) // - Edited by KL to reference crest height properly
   {
@@ -356,6 +379,7 @@ CReservoir::CReservoir(const string Name,
     _aVolume[i]=A*(_aStage[i]-_min_stage);
   }
   _max_capacity=_aVolume[_Np-1];
+  _mixing_depth = COEFF_RER_A*pow(sqrt(A),COEFF_RER_B);
 }
 
 //////////////////////////////////////////////////////////////////
@@ -398,6 +422,10 @@ CReservoir::~CReservoir()
 //
 long  CReservoir::GetSubbasinID          () const { return _SBID; }
 
+/// \returns mixing depth [m]
+//
+double  CReservoir::GetMixingDepth () const { return _mixing_depth;}
+
 //////////////////////////////////////////////////////////////////
 /// \returns Reservoir name
 //
@@ -408,6 +436,14 @@ string  CReservoir::GetReservoirName() const { return _name; }
 /// \returns reservoir storage [m3]
 //
 double  CReservoir::GetStorage           () const { return GetVolume(_stage); }
+
+/// \returns reservoir hypoliminion storage [m3]
+//
+double  CReservoir::GetHypolimnionStorage           () const { return GetVolume(_stage-_mixing_depth); }
+
+/// \returns reservoir old hypoliminion storage [m3]
+//
+double  CReservoir::GetOldHypolimnionStorage           () const { return GetVolume(_stage_last-_mixing_depth); }
 
 //////////////////////////////////////////////////////////////////
 /// \returns current stage [m]
@@ -446,6 +482,8 @@ double  CReservoir::GetSillElevation(const int nn) const
   return _crest_ht+weir_adj;
 }
 //////////////////////////////////////////////////////////////////
+
+//////////////////////////////////////////////////////////////////
 /// \returns current surface area [m2]
 //
 double  CReservoir::GetSurfaceArea       () const { return GetArea(_stage); }
@@ -454,6 +492,16 @@ double  CReservoir::GetSurfaceArea       () const { return GetArea(_stage); }
 /// \returns start-of-timestep surface area [m2]
 //
 double  CReservoir::GetOldSurfaceArea    () const { return GetArea(_stage_last); }
+
+//////////////////////////////////////////////////////////////////
+/// \returns current mixing area [m2]
+//
+double  CReservoir::GetMixingArea       () const { return GetArea(_stage-_mixing_depth); }
+
+//////////////////////////////////////////////////////////////////
+/// \returns current old mixing area [m2]
+//
+double  CReservoir::GetOldMixingArea       () const { return GetArea(_stage_last-_mixing_depth); }
 
 //////////////////////////////////////////////////////////////////
 /// \returns lakebed thickness [m]
@@ -555,6 +603,7 @@ double CReservoir::GetCrestWidth() const
 {
   return _crest_width;
 }
+
 //////////////////////////////////////////////////////////////////
 /// \brief gets max capacity
 /// \returns capacity, in m3
@@ -939,6 +988,8 @@ void CReservoir::SetCrestWidth(const double& width)
     _crest_width=width;
   }
 }
+
+
 //////////////////////////////////////////////////////////////////
 /// \brief sets max capacity
 /// \param capacity, in m3

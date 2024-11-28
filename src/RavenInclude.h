@@ -181,7 +181,7 @@ const double  TC_CLAY                 =0.216;                                   
 const double  TC_ORGANIC              =0.0216;                                  ///< [MJ/m/d/K] Thermal conductivity of organic matter (0.25 W/m/K)
 const double  TC_AIR                  =0.00199;                                 ///< [MJ/m/d/K] Thermal conductivity of air (0.023 W/m/K)
 
-const double  COM_WATER		            =4.58e-10;                                ///< [1/Pa] Compressiblity of Water
+const double  COM_WATER               =4.58e-10;                                ///< [1/Pa] Compressiblity of Water
 const double  COM_ICE                 =4.58e-10;                                ///< [1/Pa] Compressiblity of Ice
 const double  HCP_WATER               =4.186;                                   ///< [MJ/m3/K] Volumetric Heat Capacity of Water
 const double  HCP_ICE                 =1.938;                                   ///< [MJ/m3/K] Volumetric Heat Capacity of Ice

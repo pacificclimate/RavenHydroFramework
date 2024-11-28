@@ -412,7 +412,7 @@ bool ParseHRUPropsFile(CModel *&pModel, const optStruct &Options, bool terrain_r
                 //in*=CGlobalParams::GetParameter("TOC_MULTIPLIER");    // use to be this; but has its own multiplier now; maybe set default to TOC_MULTIPLIER??
                 in *= pModel->GetGlobalParams()->GetParameter("TIME_TO_PEAK_MULTIPLIER");
               }
-	            if(!aParamStrings[i].compare("GAMMA_SHAPE") && (in!=AUTO_COMPUTE) && (in!=USE_TEMPLATE_VALUE)){
+              if(!aParamStrings[i].compare("GAMMA_SHAPE") && (in!=AUTO_COMPUTE) && (in!=USE_TEMPLATE_VALUE)){
                 in *= pModel->GetGlobalParams()->GetParameter("GAMMA_SHAPE_MULTIPLIER");
               }
               if(!aParamStrings[i].compare("GAMMA_SCALE") && (in!=AUTO_COMPUTE) && (in!=USE_TEMPLATE_VALUE)){
@@ -1863,15 +1863,15 @@ CReservoir *ReservoirParse(CParser *p,string name,const CModel *pModel,long long
   //------------------------------------------------------------------------------------
   if((type==CURVE_POWERLAW) || (type==CURVE_LINEAR))
   {
-    pRes=new CReservoir(name,SBID,a_V,b_V,a_Q,b_Q,a_A,b_A,crestht,max_depth);
+    pRes=new CReservoir(name,SBID,a_V,b_V,a_Q,b_Q,a_A,b_A,crestht,max_depth,pModel);
   }
   else if(type==CURVE_DATA)
   {
-    pRes=new CReservoir(name,SBID,aQ_ht,aQ,aQund,aA,aV,NQ);//presumes aQ_ht=aV_ht=aA_ht; NA=NV=NQ
+    pRes=new CReservoir(name,SBID,aQ_ht,aQ,aQund,aA,aV,NQ,pModel);//presumes aQ_ht=aV_ht=aA_ht; NA=NV=NQ
   }
   else if(type==CURVE_VARYING)
   {
-    pRes=new CReservoir(name,SBID,nDates,aDates,aQ_ht,aQQ,aQund,aA,aV,NQ);//presumes aQ_ht=aV_ht=aA_ht; NA=NV=NQ
+    pRes=new CReservoir(name,SBID,nDates,aDates,aQ_ht,aQQ,aQund,aA,aV,NQ,pModel);//presumes aQ_ht=aV_ht=aA_ht; NA=NV=NQ
   }
   else if(type==CURVE_LAKE)
   {
@@ -1888,7 +1888,7 @@ CReservoir *ReservoirParse(CParser *p,string name,const CModel *pModel,long long
      }
     }
 
-    pRes=new CReservoir(name,SBID,weircoeff,cwidth,crestht,lakearea,max_depth);
+    pRes=new CReservoir(name,SBID,weircoeff,cwidth,crestht,lakearea,max_depth,pModel);
 
   }
   else {
