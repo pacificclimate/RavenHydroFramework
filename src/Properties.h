@@ -396,6 +396,7 @@ struct global_struct
 
   double           avg_annual_snow;          ///< [mm] avg annual snow as SWE
   double           avg_annual_runoff;        ///< [mm] avg annual runoff from basin
+
   double           reference_flow_mult;      ///< [-] multiplier for reference flow relative to annual mean flow
                                              ///< (10 for flood modelling, 0.5 for low-flow conditions)
 
@@ -426,6 +427,8 @@ struct global_struct
   double           TIME_TO_PEAK_multiplier;  ///< [0..1+] time to peak multiplier
   double           GAMMA_SHAPE_multiplier;   ///< [0..1+] Gamma shape multiplier
   double           GAMMA_SCALE_multiplier;   ///< [0..1+] Gamma scale multiplier
+  double           mix_depth_coef;           ///< [m] Reservoir mixing depth coefficient
+  double           mix_depth_expn;           ///< [-] Reservoir mixing depth exponent
   double           assimilation_fact;        ///< [0..1] assimilation factor (0=no assimilation to 1= full replacement)
   double           assim_upstream_decay;     ///< [1/km] assimilation upstream decay factor (0= overrides everything upstream, large- observation influence decays quickly with distance from gauge) [~0.01]
   double           assim_time_decay;         ///< [1/d] assimilation temporal decay factor (0=diminishes in future, 0.1 - diminshes in  3 days) [0.2]

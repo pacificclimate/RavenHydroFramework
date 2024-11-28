@@ -375,7 +375,6 @@ double CEnthalpyModel::GetEnergyLossesFromLake(const int p, double &Q_sens, doub
   //kdiff = md*(Ke+Ked+Km)*HCP_WATER;                                          //[MJ/m2/K/d]
   kdiff = threshMin(md*(Ke+Ked+Km)*HCP_WATER, 5.0, 0.0);                       //[MJ/m2/K/d]
 
-
   Q_sens  =hstar * A_avg * (temp_air -0.5*(T_new+T_old));
   Q_conv  =kdiff * A_h_avg * (0.5*(Ts_new+Ts_old)- 0.5*(T_new+T_old));
   Q_sw_in =(SW      )*A_avg;
@@ -459,7 +458,7 @@ void   CEnthalpyModel::RouteMassInReservoir   (const int          p,          //
     hstar    =pRes->GetLakeConvectionCoeff();                             //[MJ/m2/d/K]
 //  ksed     =pRes->GetLakebedConductivity()/0.5/ pRes->GetLakebedThickness();//[MJ/m2/d/K]
   }
-
+  
 ///////////// Option 1 to calculate kdiff  
 //// water density in each layer as a function of water temperature (Chapra, 2008)
 //double dens_e,dens_h,vdiff,kdiff; 
@@ -1390,7 +1389,7 @@ void CEnthalpyModel::WriteMinorOutput(const optStruct& Options,const time_struct
           _LAKEOUT << mult * Ein       << "," << mult * Eout      << ",";
           _LAKEOUT << mult * Q_rain    << "," << mult * Q_sens    << ",";
           _LAKEOUT << mult * Q_conv    << "," << mult * Q_adv     << ",";
-          _LAKEOUT << mult * Ri        << "," << N2               << "," << kdiff  << ",";
+          _LAKEOUT << Ri               << "," << N2               << "," << kdiff  << ",";
           _LAKEOUT << mult * Q_lat    << ",";
           _LAKEOUT << mult * Q_sw_in   << "," << mult * Q_lw_in   << "," << mult * Q_lw_out  << ",";
           _LAKEOUT << mult * _aMres[p] << "," << mult * _aMsed[p] << ",";

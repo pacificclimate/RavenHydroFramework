@@ -163,17 +163,20 @@ public:/*-------------------------------------------------------*/
              const double a_v, const double b_v,
              const double a_Q, const double b_Q,
              const double a_A, const double b_A,
-             const double crestht, const double depth);
+             const double crestht, const double depth,
+             const CModelABC* pModel);
   CReservoir(const string name, const long SubID,
              const double *a_ht,
              const double *a_Q, const double *aQ_und,const double *a_A, const double *a_V,
-             const int     nPoints);
+             const int     nPoints,
+             const CModelABC* pModel);
   CReservoir(const string Name, const long SubID,
              const int nDates, const int *aDates, const double *a_ht,
              double **a_QQ, const double *aQ_und, const double *a_A, const double *a_V,
-             const int     nPoints);
+             const int     nPoints,
+             const CModelABC* pModel);
   CReservoir(const string Name, const long SubID, const double weircoeff, //Lake constructor
-             const double crestw, const double crestht, const double A, const double depth);
+             const double crestw, const double crestht, const double A, const double depth,const CModelABC* pModel);
   ~CReservoir();
 
   //Accessors
