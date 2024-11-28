@@ -117,7 +117,7 @@ private:/*-------------------------------------------------------*/
   double      *_aQstruct;            ///< array of flows from control structures at end of time step [m3/s]
   double      *_aQstruct_last;       ///< array of flows from control structures at start of time step [m3/s]
   double      *_aQdelivered;         ///< amount of water demand delivered for each demand [m3/s] (for management optimization)
-  double      *_aQreturned;          ///< amount of water returned for each demand [m3/s] 
+  double      *_aQreturned;          ///< amount of water returned for each demand [m3/s]
 
   res_constraint _constraint;        ///< current constraint type
 
@@ -181,6 +181,7 @@ public:/*-------------------------------------------------------*/
 
   //Accessors
   long              GetSubbasinID            () const;
+  string            GetReservoirName         () const;
 
   double            GetStorage               () const; //[m3]
   double            GetOldStorage            () const; //[m3]
@@ -238,7 +239,7 @@ public:/*-------------------------------------------------------*/
   void              SetReservoirStage        (const double &ht, const double &ht_last);
   void              SetControlFlow           (const int i, const double &Q, const double &Qlast);
   void              SetOptimizedOutflow      (const double &Qout);
-  void              SetVolumeStageCurve      (const double *a_ht,const double *a_V,const int nPoints);
+  void              SetVolumeStageCurve      (const double *a_ht,const double *a_V,const int nPoints, double weircoeff, double crestwidth);
   void              SetAreaStageCurve        (const double *a_ht,const double *a_A,const int nPoints);
   void              SetGWParameters          (const double &coeff, const double &h_ref);
   void              SetCrestWidth            (const double &width);
@@ -280,7 +281,7 @@ public:/*-------------------------------------------------------*/
 
   //Called during initialization:
   void              Initialize               (const optStruct &Options);
-  void              InitializePostRVM        (const optStruct &Options); 
+  void              InitializePostRVM        (const optStruct &Options);
 
   //Called during simulation:
 

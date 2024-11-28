@@ -42,9 +42,10 @@ enum dv_type
   DV_QOUT,    //< outflow from reach
   DV_QOUTRES, //< outflow from reservoir
   DV_STAGE,   //< reservoir stage
+  DV_DSTAGE,  //< change in reservoir stage over time step
   DV_BINRES,  //< binary integer value for above/beneath stage-discharge sill
   DV_DELIVERY,//< delivery of water demand
-  DV_RETURN,  //< return flows to reach 
+  DV_RETURN,  //< return flows to reach
   DV_USER,    //< user specified decision variable
   DV_SLACK    //< slack variable for goal satisfaction
 };
@@ -70,7 +71,7 @@ struct decision_var
     name=nam;
     p_index=p;
     loc_index=loc_ind;
-    value=0.0;min=0.0;max=ALMOST_INF;dvar_type=typ;dem_index=DOESNT_EXIST;
+    value=0.0;min=-ALMOST_INF;max=ALMOST_INF;dvar_type=typ;dem_index=DOESNT_EXIST;
   }
 };
 //////////////////////////////////////////////////////////////////
@@ -204,7 +205,7 @@ private: /*------------------------------------------------------*/
   int              _nDemandGroups;      //< number of demand groups
   CDemandGroup   **_pDemandGroups;      //< array of pointers to demand groups
 
-  int              _nEnviroFlowGoals;   //< number of *active* environmental flow goals 
+  int              _nEnviroFlowGoals;   //< number of *active* environmental flow goals
   double          *_aSlackValues;       //< array of slack variable values [size: _nSlackVars]
   int              _nSlackVars;         //< number of slack variables
 
@@ -236,8 +237,6 @@ private: /*------------------------------------------------------*/
 
   bool            _demands_initialized;//< true if demands have been initialized
 
-  bool            _stage_discharge_as_goal; //< TMP DEBUG - SET TO TRUE IF SD CURVE IS GOAL INSTEAD OF CONSTRAINT 
-
   int             _do_debug_level;      //< =1 if debug info is to be printed to screen, =2 if LP matrix also printed (full debug), 0 for nothing
 
   //Called during simualtion
@@ -253,7 +252,7 @@ private: /*------------------------------------------------------*/
 
 
 #ifdef _LPSOLVE_
-  void            WriteLPSubMatrix(lp_lib::lprec *pLinProg, string filename, const optStruct &Options) const; //for debugging 
+  void            WriteLPSubMatrix(lp_lib::lprec *pLinProg, string filename, const optStruct &Options) const; //for debugging
   void           AddConstraintToLP(const int i, const int k, lp_lib::lprec *pLinProg, const time_struct &tt,int *col_ind, double *row_val) const;
   void      IncrementAndSetRowName(lp_lib::lprec *pLinProg,int &rowcount,const string &name);
 #endif
@@ -271,9 +270,9 @@ public: /*------------------------------------------------------*/
 
   int           GetDemandIndexFromName(const string dname) const;
   double        GetNamedConstant      (const string s) const;
+  double        GetUnitConversion     (const string s) const;
   int           GetUserDVIndex        (const string s) const;
-  double        GetControlVariable    (const string s) const;
-  //double      GetDemandDelivery     (const int p) const;
+  double        GetControlVariable    (const string s, int &index) const;
   int           GetNumUserDVs         () const;
   int           GetDebugLevel         () const;
   int           GetIndexFromDVString  (string s) const;
@@ -295,7 +294,8 @@ public: /*------------------------------------------------------*/
   void   AddDecisionVar        (const decision_var *pDV);
   void   SetDecisionVarBounds  (const string name, const double &min, const double &max);
   void   AddUserConstant       (const string name, const double &val);
-  void   AddControlVariable    (const string name, expressionStruct* pExp);
+  void   AddControlVariable    (const string name);
+  void   TieExpToControlVar    (expressionStruct* pExp);
   void   AddUserTimeSeries     (const CTimeSeries *pTS);
   void   AddUserLookupTable    (const CLookupTable *pLUT);
 

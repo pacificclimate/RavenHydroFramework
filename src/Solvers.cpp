@@ -490,7 +490,7 @@ void MassEnergyBalance( CModel            *pModel,
         pModel->GetSubBasin(p)->GetReservoir()->SetPrecip(SWvol);//[SW is treated as precip on reservoir]
       }
       else{
-        aRouted[p]+=SWvol;             //surface water moved instantaneously from HRU to basin reach/channel storage
+        aRouted[p]+=SWvol;             //surface water moved from HRU to in-catchment routing
       }
       aPhinew[k][iRO]=aPhinew[k][iSW]; //track net runoff [mm]
       aPhinew[k][iSW]=0.0;             //zero out surface water storage
@@ -558,19 +558,19 @@ void MassEnergyBalance( CModel            *pModel,
     {
       pBasin->UpdateInflow(aQinnew[p]);              // from upstream, diversions, and specified flows
 
-      pBasin->UpdateLateralInflow(aRouted[p]/(tstep*SEC_PER_DAY));//[m3/d]->[m3/s] 
+      pBasin->UpdateLateralInflow(aRouted[p]/(tstep*SEC_PER_DAY));//[m3/d]->[m3/s]
 
       pBasin->RouteWater    (aQoutnew,Options,tt);
 
       irr_Q=pBasin->ApplyIrrigationDemand(t+tstep,aQoutnew[pBasin->GetNumSegments()-1],Options.management_optimization);
 
-      div_Q_total=0; 
+      div_Q_total=0;
       for(int i=0; i<pBasin->GetNumDiversions();i++) { //upstream of reservoir!
         div_Q=pBasin->GetDiversionFlow(i,pBasin->GetChannelOutflowRate(),Options,tt,pDivert); //diversions based upon flows at start of timestep (without diversions)
         div_Q_total+=div_Q;
       }
 
-      down_Q=pBasin->GetDownstreamInflow(t)+pBasin->GetTotalReturnFlow(); 
+      down_Q=pBasin->GetDownstreamInflow(t)+pBasin->GetTotalReturnFlow();
 
       aQoutnew[pBasin->GetNumSegments()-1]+=down_Q; //add return flows and Basin inflow hydrographs (type2)
 
@@ -653,6 +653,8 @@ void MassEnergyBalance( CModel            *pModel,
 
         pConstitModel->SetMassInflows    (p,aMinnew[p]);
         pConstitModel->SetLateralInfluxes(p,aRoutedMass[p]);
+        
+        pConstitModel->InCatchmentRoute  (p,Mlat_new,Options);//prepares, calculates, and updates Mlat_new
         pConstitModel->PrepareForRouting (p);
         pConstitModel->RouteMass         (p,aMoutnew,Mlat_new,ResMass,ResSedMass,Options,tt);  //Where everything happens!
         pConstitModel->UpdateMassOutflows(p,aMoutnew,Mlat_new,ResMass,ResSedMass,MassOutflow,Options,tt,false); //actually updates mass flow values here

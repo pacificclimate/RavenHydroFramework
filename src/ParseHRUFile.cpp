@@ -826,21 +826,7 @@ bool ParseHRUPropsFile(CModel *&pModel, const optStruct &Options, bool terrain_r
                 }
             }
         }
-        else if(!strcmp(s[4],"UPSTREAM_OF"))
-        {
-          int SBID=s_to_l(s[5]);
-          int iter=0;
-          for(int p=0;p<pModel->GetNumSubBasins();p++)
-          {
-            if(pModel->IsSubBasinUpstream(pModel->GetSubBasin(p)->GetID(),SBID)) {
-              pSBGroup->AddSubbasin(pModel->GetSubBasin(p));
-              advice=advice+to_string(pModel->GetSubBasin(p)->GetID())+" ";
-              iter++;
-              if(iter%40==0) { advice=advice+"\n      "; }
-            }
-          }
-        }
-        else if(!strcmp(s[4],"UPSTREAM_OF_INCLUSIVE"))
+        else if(!strcmp(s[4],"UPSTREAM_OF")) /*inclusive of basin*/
         {
           int SBID=s_to_l(s[5]);
           int iter=0;
@@ -855,7 +841,7 @@ bool ParseHRUPropsFile(CModel *&pModel, const optStruct &Options, bool terrain_r
             }
           }
         }
-        else if(!strcmp(s[4],"DOWNSTREAM_OF"))
+        else if(!strcmp(s[4],"DOWNSTREAM_OF"))/*not inclusive of basin*/
         {
           CSubBasin *pBasin=pModel->GetSubBasinByID(s_to_l(s[5]));
           if(pBasin==NULL) {
@@ -1177,7 +1163,6 @@ CReservoir *ReservoirParse(CParser *p,string name,const CModel *pModel,long long
   :Reservoir ExampleReservoir
     :SubBasinID 23
     :HRUID 234
-    :Type RESROUTE_STANDARD
     :VolumeStageRelation POWER_LAW
       0.1 2.3
     :EndVolumeStageRelation
@@ -1192,7 +1177,6 @@ CReservoir *ReservoirParse(CParser *p,string name,const CModel *pModel,long long
   :Reservoir ExampleReservoir
     :SubBasinID 23
     :HRUID 234
-    :Type RESROUTE_STANDARD
     :StageRelations
       21 # number of points
       0.09 0 0 0.0  (h [m], Q [m3/s], V [m3], A [m2])
@@ -1206,7 +1190,6 @@ CReservoir *ReservoirParse(CParser *p,string name,const CModel *pModel,long long
   :Reservoir ExampleReservoir
     :SubBasinID 23
     :HRUID 234
-    :Type RESROUTE_TIMEVARYING
     :VaryingStageRelations
       21 # number of points
       [jul day1] [jul day2] [jul day3] ...
@@ -1221,7 +1204,6 @@ CReservoir *ReservoirParse(CParser *p,string name,const CModel *pModel,long long
   :Reservoir ExampleReservoir # 'lake type format'
     :SubBasinID 23
     :HRUID 234
-    :Type RESROUTE_STANDARD
     :WeirCoefficient 0.6
     :CrestWidth 10
     :MaxDepth 5.5 # relative to minimum weir crest elevation
@@ -1232,7 +1214,6 @@ CReservoir *ReservoirParse(CParser *p,string name,const CModel *pModel,long long
   :Reservoir ExampleReservoir # 'multiple control structure format'
     :SubBasinID [ID]
     :HRUID [ID]
-    :Type RESROUTE_STANDARD
     :StageRelations
       # these provide the base stage-storage-area-discharge curves for reservoir.
       # The 'main outflow' is still controlled as before and can only drain to the downstream basin.
@@ -1438,7 +1419,7 @@ CReservoir *ReservoirParse(CParser *p,string name,const CModel *pModel,long long
             if(IsComment(s[0],Len)) { i--; }
             else {
               aV_ht[i] = s_to_d(s[0]);
-              aV[i] = s_to_d(s[1]);
+              aV   [i] = s_to_d(s[1]);
             }
           }
           p->Tokenize(s,Len); //:EndVolumeStageRelation
@@ -1924,7 +1905,7 @@ CReservoir *ReservoirParse(CParser *p,string name,const CModel *pModel,long long
   }
   if((type==CURVE_LAKE) && (aV!=NULL) && (aV_ht!=NULL))
   {
-    pRes->SetVolumeStageCurve(aV_ht,aV,NV);//allows user to override prismatic lake assumption
+    pRes->SetVolumeStageCurve(aV_ht,aV,NV, weircoeff, cwidth);//allows user to override prismatic lake assumption
   }
   if((type==CURVE_LAKE) && (aA!=NULL) && (aA_ht!=NULL))
   {

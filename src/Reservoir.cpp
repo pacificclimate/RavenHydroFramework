@@ -295,7 +295,7 @@ CReservoir::CReservoir(const string Name, const long SubID,
     _aQunder[i]=0.0;if(a_Qund!=NULL){ _aQunder[i]=a_Qund[i]; }
     _aArea  [i]=a_A[i];
     _aVolume[i]=a_V[i];
-    if (_aQ[i]==0){_crest_ht=_aStage[i]; } 
+    if (_aQ[i]==0){_crest_ht=_aStage[i]; }
     for (int v = 0; v < _nDates; v++){
       _aQ_back[v][i] = a_QQ[v][i];
       if ((i > 0) && ((_aQ_back[v][i] - _aQ_back[v][i-1]) < -REAL_SMALL)){
@@ -427,6 +427,12 @@ long  CReservoir::GetSubbasinID          () const { return _SBID; }
 double  CReservoir::GetMixingDepth () const { return _mixing_depth;}
 
 //////////////////////////////////////////////////////////////////
+/// \returns Reservoir name
+//
+string  CReservoir::GetReservoirName() const { return _name; }
+
+
+//////////////////////////////////////////////////////////////////
 /// \returns reservoir storage [m3]
 //
 double  CReservoir::GetStorage           () const { return GetVolume(_stage); }
@@ -465,9 +471,9 @@ double  CReservoir::GetMaxStage          (const int nn) const {
 }
 //////////////////////////////////////////////////////////////////
 /// \returns sill elevation [m]
-/// supports time-variable discharge curves and weir height adjustments 
+/// supports time-variable discharge curves and weir height adjustments
 //
-double  CReservoir::GetSillElevation(const int nn) const 
+double  CReservoir::GetSillElevation(const int nn) const
 {
   double weir_adj=0.0;
   if (_pWeirHeightTS!=NULL){
@@ -684,12 +690,12 @@ int    CReservoir::GetNumWaterDemands() const {
 /// \brief returns water/irrigation demand object
 /// \return water/irrigation demand object
 //
-CDemand* CReservoir::GetWaterDemandObj(const int ii) const 
+CDemand* CReservoir::GetWaterDemandObj(const int ii) const
 {
 #ifdef _STRICTCHECK_
   ExitGracefullyIf(ii < 0 || ii >= _nWaterDemands, "CReservoir::GetWaterDemandObj: invalid index",RUNTIME_ERR);
 #endif
-  return _pWaterDemands[ii]; 
+  return _pWaterDemands[ii];
 }
 //////////////////////////////////////////////////////////////////
 /// \brief Returns specified irrigation/water use demand from reservoir at time t
@@ -797,7 +803,7 @@ void CReservoir::Initialize(const optStruct &Options)
 /// \brief Initializes SB demand members AFTER RVM FILE READ
 /// \param &Options [in] Global model options information
 //
-void  CReservoir::InitializePostRVM(const optStruct& Options) 
+void  CReservoir::InitializePostRVM(const optStruct& Options)
 {
   _aQdelivered = new double [_nWaterDemands];
   _aQreturned  = new double [_nWaterDemands];
@@ -1054,16 +1060,54 @@ string CReservoir::GetCurrentConstraint() const {
 /// \param nPoints - number of points in array
 //
 
-void CReservoir::SetVolumeStageCurve(const double *a_ht,const double *a_V,const int nPoints)
+void CReservoir::SetVolumeStageCurve(const double *a_ht,const double *a_V,const int nPoints, double weircoeff, double crestwidth)
 {
-  for(int i=0;i<_Np;i++)
+  for(int i=1;i<nPoints;i++)
   {
-    _aVolume[i]=InterpolateCurve(_aStage[i],a_ht,a_V,nPoints,false);
-    if((i > 0) && ((_aVolume[i] - _aVolume[i-1]) <= -REAL_SMALL) && (_aVolume[i]!=0.0)) {
+    if (((a_ht[i]-a_ht[i-1])<=REAL_SMALL) || ((a_V[i]-a_V[i-1])<=REAL_SMALL)){
       string warn = "CReservoir::SetVolumeStageCurve: volume-stage relationships must be monotonically increasing for all stages. [bad reservoir: " + _name + " "+to_string(_SBID)+"]";
       ExitGracefully(warn.c_str(),BAD_DATA_WARN);
     }
   }
+  if (a_V[0]!=0.0){
+    string warn = "CReservoir::SetVolumeStageCurve: volume-stage relationships must start with volume of zero. [bad reservoir: " + _name + " "+to_string(_SBID)+"]";
+    ExitGracefully(warn.c_str(),BAD_DATA_WARN);
+  }
+
+  _min_stage  =a_ht[0];
+  _max_stage  =a_ht[nPoints-1];
+
+  //_Np=102; //SAME AS LAKE TYPE CONSTRUCTOR, BY NECESSITY!
+
+  //cout<<_name<<" CREST HEIGHT : "<<_crest_ht<<endl;
+  double dh;
+  string warn;
+  dh=(_max_stage-_min_stage)/(_Np-1);
+  _aStage [0]=_min_stage; //Memory
+  _aQ     [0]=0.0;
+  _aQunder[0]=0.0;
+  _aArea  [0]=0.0;
+  _aArea  [0]=(InterpolateCurve(_aStage[0]+dh,a_ht,a_V,nPoints,false))/dh; //Area CANNOT go to zero
+  _aVolume[0]=0.0;
+   for (int i=1;i<_Np;i++)
+  {
+    _aStage [i]=_min_stage+i*dh;
+    _aQ      [i]=0.0;
+    if ((_aStage[i]-_crest_ht)>0.0){
+      _aQ    [i]=2.0/3.0*weircoeff*sqrt(2*GRAVITY)*crestwidth*pow((_aStage[i]-_crest_ht),1.5); //Overflow weir equation
+    }
+    if (((_aStage[i]-_crest_ht)<dh) && ((_aStage[i]-_crest_ht)>=0.0)){
+      _aStage[i]=_crest_ht; //ensures there is a point that perfectly coincides with crest
+      _aQ    [i]=0.0;
+    }
+    _aQunder[i]=0.0;
+    _aVolume[i]=InterpolateCurve (_aStage[i]   ,a_ht,a_V,nPoints,false);
+    _aArea  [i]=(InterpolateCurve(_aStage[i]+dh,a_ht,a_V,nPoints,false)-_aVolume[i])/dh;
+    //cout<<" "<<_aStage[i]<<" "<<_aVolume[i]<<" "<<_aArea[i]<<" "<<_aQ    [i]<<endl;
+
+  }
+  _max_capacity=_aVolume[_Np-1];
+
 }
 //////////////////////////////////////////////////////////////////
 /// \brief overrides area stage curve for Lake-type reservoirs (if known)
@@ -1201,7 +1245,7 @@ double CReservoir::ScaleFlow(const double& scale,const bool overriding, const do
 /// \param &Options [in] Global model options information
 /// \param &tt [in] time structure at start of current time step
 //
-void CReservoir::UpdateDemands(const optStruct& Options, const time_struct& tt) 
+void CReservoir::UpdateDemands(const optStruct& Options, const time_struct& tt)
 {
   for (int ii = 0; ii < _nWaterDemands; ii++) {
     _pWaterDemands[ii]->UpdateDemand(Options,tt);
@@ -1285,7 +1329,7 @@ void CReservoir::AddToDeliveredDemand(const int ii, const double &Qdel)
 {
 #ifdef _STRICTCHECK_
   ExitGracefullyIf((ii<0) || (ii>=_nWaterDemands),"CReservoir::AddToDeliveredDemand: invalid demand index",RUNTIME_ERR);
-#endif 
+#endif
   _aQdelivered[ii]=Qdel;
 }
 //////////////////////////////////////////////////////////////////
@@ -1297,7 +1341,7 @@ void CReservoir::RecordReturnFlow(const int ii, const double &Qret)
 {
 #ifdef _STRICTCHECK_
   ExitGracefullyIf((ii<0) || (ii>=_nWaterDemands),"CReservoir::RecordReturnFlow: invalid demand index",RUNTIME_ERR);
-#endif 
+#endif
   _aQreturned[ii]=Qret;
 }
 //////////////////////////////////////////////////////////////////

@@ -11,14 +11,14 @@
 #            Mar 2017    Juliane Mai    - increase stack size to 256 MB from standard 64MB
 #            Jan 2019    Alan J. Barton - added OS name to created exe name
 #            Dec 2023    David Huard    - support for python binding
-#            Jul 2024    James Craig and Bohao Tang - support for lp_solve 
+#            Jul 2024    James Craig and Bohao Tang - support for lp_solve
 ###
 # appname := raven_rev$(shell svnversion -n . | sed -e 's/:/-/g')_$(shell uname -o).exe
 appname := Raven.exe
 
 CXX      := g++
 CXXFLAGS := -Wno-deprecated
-LDLIBS   := 
+LDLIBS   :=
 LDFLAGS  :=
 
 # OPTION 0) some compilers require the c++11 flag, some may not
@@ -37,7 +37,7 @@ LDLIBS   += -L/usr/local -lnetcdf
 # LDFLAGS  += -Wl,-stack_size,0x80000000,-stack_addr,0xf0000000
 
 # OPTION 4) uncomment for M1 and newer MacOS
-#CXXFLAGS += -Dfinite=isfinite 
+#CXXFLAGS += -Dfinite=isfinite
 
 srcfiles := $(shell ls *.cpp)
 objects  := $(patsubst %.cpp, %.o, $(srcfiles))
