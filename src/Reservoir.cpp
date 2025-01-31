@@ -24,6 +24,7 @@ void CReservoir::BaseConstructor(const string Name,const long SubID)
   _lakebed_thick=1.0;
   _lakebed_cond =0.0;
   _lake_convcoeff=2.0;
+  _lake_lyr_convcoeff=0.0;
 
   _stage     =0.0;
   _stage_last=0.0;
@@ -519,6 +520,11 @@ double  CReservoir::GetLakebedConductivity() const { return _lakebed_cond; }
 double  CReservoir::GetLakeConvectionCoeff() const { return _lake_convcoeff; }
 
 //////////////////////////////////////////////////////////////////
+/// \returns lake between-layer thermal convection coefficient [MJ/m2/d/K]
+//
+double  CReservoir::GetLakeLyrConvectionCoeff() const { return _lake_lyr_convcoeff; }
+
+//////////////////////////////////////////////////////////////////
 /// \returns current outflow rate [m3/s]
 //
 double  CReservoir::GetOutflowRate       () const { return _DAscale*_Qout; }
@@ -548,6 +554,17 @@ double  CReservoir::GetIntegratedControlOutflow(const int i, const double& tstep
 {
   return 0.5*(_aQstruct[i]+_aQstruct_last[i])*(tstep*SEC_PER_DAY); //integrated
 }
+
+//////////////////////////////////////////////////////////////////
+/// \returns previous downward flow rate between reservoir layers [m3/d]
+//
+double  CReservoir::GetOldDownwardFlowRate() const { return _Q_dn_old; }
+
+//////////////////////////////////////////////////////////////////
+/// \returns previous upward flow rate between reservoir layers [m3/d]
+//
+double  CReservoir::GetOldUpwardFlowRate() const { return _Q_up_old; }
+
 //////////////////////////////////////////////////////////////////
 /// \returns previous storage [m3]
 //
@@ -1031,6 +1048,12 @@ void CReservoir::SetLakeConvectionCoeff(const double& conv) {
   _lake_convcoeff=conv;
 }
 //////////////////////////////////////////////////////////////////
+/// \brief sets lake between-layer convection coeff
+//
+void CReservoir::SetLakeLyrConvectionCoeff(const double& conv) {
+  _lake_lyr_convcoeff=conv;
+}
+//////////////////////////////////////////////////////////////////
 /// \brief gets current constraint name
 /// \returns current constraint applied to estimate stage/flow
 //
@@ -1509,6 +1532,24 @@ void  CReservoir::SetReservoirStage(const double &ht,const double &ht_last)
 void  CReservoir::SetMinStage(const double &min_z)
 {
   _min_stage=min_z;
+}
+
+//////////////////////////////////////////////////////////////////
+/// \brief sets previous downward flow rate
+/// \param Q_dn [in] downward flow rate between lake layers [m3/d]
+//
+void  CReservoir::SetOldDownwardFlowRate(const double &Q_dn)
+{
+  _Q_dn_old=Q_dn;
+}
+
+//////////////////////////////////////////////////////////////////
+/// \brief sets previous upward flow rate
+/// \param Q_up [in] upward flow rate between lake layers [m3/d]
+//
+void  CReservoir::SetOldUpwardFlowRate(const double &Q_up)
+{
+  _Q_up_old=Q_up;
 }
 
 //////////////////////////////////////////////////////////////////

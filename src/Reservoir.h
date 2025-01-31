@@ -60,6 +60,7 @@ private:/*-------------------------------------------------------*/
   double       _lakebed_thick;       ///< lakebed thickness [m]
   double       _lakebed_cond;        ///< lakebed thermal conductivity [MJ/m/K/d]
   double       _lake_convcoeff;      ///< lake surface thermal convection coefficient [MJ/m2/d/K]
+  double       _lake_lyr_convcoeff;  ///< lake between-layer thermal convection coefficient  [MJ/m2/d/K]
 
   const CHydroUnit  *_pHRU;          ///< (potentially zero-area) HRU used for Precip/ET calculation (or NULL for no ET)
 
@@ -108,8 +109,8 @@ private:/*-------------------------------------------------------*/
   double       _stage_last;          ///< stage at beginning of current time step [m]
   double       _Qout;                ///< outflow corresponding to current stage [m3/s]
   double       _Qout_last;           ///< outflow at beginning of current time step [m3/s]
-  double       _Q_dn_old;
-  double       _Q_up_old;
+  double       _Q_dn_old;            ///< downward flow between layers at beginning of current time step [m3/d]
+  double       _Q_up_old;            ///< upward flow between layers at beginning of current time step [m3/d]
   double       _MB_losses;           ///< losses over current time step [m3]
   double       _AET;                 ///< losses through AET only [m3]
   double       _Precip;              ///< gains through precipitation [m3]
@@ -191,6 +192,8 @@ public:/*-------------------------------------------------------*/
   double            GetOldOutflowRate        () const; //[m3/s]
   double            GetIntegratedOutflow     (const double &tstep) const; //[m3]
   double            GetControlOutflow        (const int i) const; //[m3]
+  double            GetOldUpwardFlowRate     () const; //[m3/d]
+  double            GetOldDownwardFlowRate   () const; //[m3/d]
   double            GetIntegratedControlOutflow(const int i, const double& tstep) const; //[m3]
   double            GetReservoirLosses       (const double &tstep) const; //[m3]
   double            GetReservoirEvapLosses   (const double &tstep) const; //[m3]
@@ -205,6 +208,7 @@ public:/*-------------------------------------------------------*/
   double            GetLakebedThickness      () const; //[m]
   double            GetLakebedConductivity   () const; //[MJ/m/K/d]
   double            GetLakeConvectionCoeff   () const; //[MJ/m2/d/K]
+  double            GetLakeLyrConvectionCoeff() const; //[MJ/m2/d/K]
   double            GetDischargeFromStage    (const double &stage, const int nn) const; //[m3/s]
   double            GetStageDischargeDerivative(const double &stage,const int nn) const; //[m3/s/d]
   double            GetMinStage              (const int nn) const;//[m]
@@ -250,6 +254,9 @@ public:/*-------------------------------------------------------*/
   void              SetLakebedThickness      (const double &thick);
   void              SetLakebedConductivity   (const double &cond);
   void              SetLakeConvectionCoeff   (const double &conv);
+  void              SetLakeLyrConvectionCoeff(const double &conv);
+  void              SetOldUpwardFlowRate     (const double &Q_up);
+  void              SetOldDownwardFlowRate   (const double &Q_dn);
 
   void              AddDemand                (CDemand *pDemand);
 

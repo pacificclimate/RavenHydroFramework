@@ -59,7 +59,7 @@ public:/*-------------------------------------------------------*/
   double GetWaterTemperature     (const double *state_vars, const int iWater) const;
 
   double GetEnergyLossesInTransit(const int p,double &Q_sens,double &Q_GW) const;
-  double GetEnergyLossesFromLake (const int p,double &Q_sens,double &Q_cond,double &Q_lat,double &Q_rad_in,double &Q_lw_in, double &Q_lw_out, double &Q_rain, double &Q_adv, double &Ri, double &N2, double &kdiff) const;
+  double GetEnergyLossesFromLake (const int p,double &Q_sens,double &Q_cond,double &Q_lat,double &Q_rad_in,double &Q_lw_in, double &Q_lw_out, double &Q_rain, double &Q_adv, double &kdiff) const;
   double GetEnergyLossesFromReach(const int p,double &Q_sens,double &Q_cond,double &Q_lat,double &Q_GW,double &Q_rad_in,double &Q_lw_in, double &Q_lw_out,double &Q_lateral, double &Q_fric, double &Tave) const;
 
   double GetOutflowIceFraction   (const int p) const;
