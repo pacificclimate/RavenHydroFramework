@@ -299,8 +299,8 @@ double CEnthalpyModel::GetEnergyLossesFromLake(const int     p,
   double Acorr=1.0;
   double SW(0), LW(0), LW_in(0), temp_air(0), AET(0);
   double hstar(0), ksed(0), Vsed=0.001;
-  double T_new =ConvertVolumetricEnthalpyToTemperature(_aMres[p]      / V_e_new);
-  double Ts_new=ConvertVolumetricEnthalpyToTemperature(_aMsed[p]      / V_h_new );
+  double T_new =ConvertVolumetricEnthalpyToTemperature(_aMres[p] / V_e_new);
+  double Ts_new=ConvertVolumetricEnthalpyToTemperature(_aMsed[p] / V_h_new );
  
   if(pHRU!=NULL) { //otherwise only simulate advective mixing+rain input
     Acorr    =pHRU->GetArea()*M2_PER_KM2/A_new; //handles the fact that GetAET() returns mm/d normalized by HRU area, not actual area
@@ -369,6 +369,7 @@ void   CEnthalpyModel::RouteMassInReservoir   (const int          p,          //
   double A_h_old = pRes->GetOldMixingArea();
   double A_h_avg = 0.5 * (A_h_new + A_h_old);
   double zm = pRes->GetMixingDepth();
+  double kdiff_max = _pModel->GetGlobalParams()->GetParams()->lake_lyr_conv_coeff_max;
   
   double tstep=Options.timestep; 
   
@@ -470,8 +471,7 @@ void   CEnthalpyModel::RouteMassInReservoir   (const int          p,          //
   }
   
   //Final diffusion coefficient
-  kdiff = threshMin(md*(Ke+Ked+Km)*HCP_WATER, 5.0, 0.0);  //[MJ/m2/K/d]
-  //kdiff = md*(Ke+Ked+Km)*HCP_WATER;  //[MJ/m2/K/d]
+  kdiff = threshMin(md*(Ke+Ked+Km)*HCP_WATER, kdiff_max, 0.0);  //[MJ/m2/K/d]
   ////////////////////////////////
   
   pRes->SetLakeLyrConvectionCoeff(kdiff);
@@ -556,7 +556,7 @@ void   CEnthalpyModel::RouteMassInReservoir   (const int          p,          //
     Es_guess +=dEs;
     iter++;
     
-    if (iter>2){cout<<"iter: "<<iter<<" change: "<<change<<" tol: "<<tolerance<<" dE: "<<dE<<" dEs: "<<dEs<<endl;}
+    //if (iter>2){cout<<"iter: "<<iter<<" change: "<<change<<" tol: "<<tolerance<<" dE: "<<dE<<" dEs: "<<dEs<<endl;}
 
     // Rough estimate of dE and dEs if numerical routine fails to converge
     if (iter>25){
@@ -585,67 +585,10 @@ void   CEnthalpyModel::RouteMassInReservoir   (const int          p,          //
     }
   }
   
-  string thisdate=tt.date_string;
-  string thishour=DecDaysToHours(tt.julian_day);
-  double stage = pRes->GetResStage ();
-  double T_new =ConvertVolumetricEnthalpyToTemperature(E_guess  / V_e_new);
-  double Ts_new=ConvertVolumetricEnthalpyToTemperature(Es_guess / V_h_new );
-  
-  /*
-  // Diagnostic data dump
-  cout << "Name ="<<pRes->GetReservoirName()<<endl;
-  cout << "Time= "<<tt.model_time<<endl;
-  cout << "Date= "<<thisdate<<endl;
-  cout << "Hour= "<<thishour<<endl;
-  cout << "mixing_depth= "<<zm<<endl;
-  cout << "stage= "<<stage<<endl;
-  cout << "A_new= "<<A_new<<endl;
-  cout << "A_h_new= "<<A_h_new<<endl;
-  cout << "V_h_new= "<<V_h_new<<endl;
-  cout << "V_e_new= "<<V_e_new<<endl;
-  cout << "Ze= "<<Ze<<endl;
-  cout << "Zh= "<<Zh<<endl;
-  cout << "Zc= "<<Zc<<endl;
-  cout << "Q_new= "<<Q_new<<endl;
-  cout << "Q_dn_old= "<<Q_dn_old<<endl;
-  cout << "Q_dn_new= "<<Q_dn_new<<endl;
-  cout << "Q_up_old= "<<Q_up_old<<endl;
-  cout << "Q_up_new= "<<Q_up_new<<endl;
-  cout << "Q_vert= "<<Q_vert<<endl;
-  cout << "u2= "<<u2<<endl;
-  cout << "T_old= "<<T_old<<endl;
-  cout << "Ts_old= "<<Ts_old<<endl;
-  cout << "dens_e= "<<dens_e<<endl;
-  cout << "dens_h= "<<dens_h<<endl;
-  cout << "T_new= "<<T_new<<endl;
-  cout << "Ts_new= "<<Ts_new<<endl;
-  cout << "temp_air= "<<temp_air<<endl;
-  cout << "SW= "<<SW<<endl;
-  cout << "LW_in= "<<LW_in<<endl;
-  cout << "LW= "<<LW<<endl;
-  cout << "AET= "<<AET<<endl;
-  cout << "Ein = "<<aMout_new[nSegments-1]<<endl;
-  cout << "Erain = "<<_aMresRain[p]<<endl;
-  cout << "hstar= "<<hstar<<endl;
-  cout << "wstar= "<<wstar<<endl;
-  cout << "kstar= "<<kstar<<endl;
-  cout << "Ri= "<<Ri<<endl;
-  cout << "N2= "<<N2<<endl;
-  cout << "Ke= "<<Ke<<endl;
-  cout << "Ked= "<<Ked<<endl;
-  cout << "Km= "<<Km<<endl;
-  cout << "md= "<<md<<endl;
-  cout << "kdiff= "<<kdiff<<endl;
-  cout << "E_last= "<<_aMres[p]<<endl;
-  cout << "Es_last= "<<_aMsed[p]<<endl;
-  cout << "dE= "<<dE<<endl;
-  cout << "dEs= "<<dEs<<endl;
-  cout << "E_new= "<<E_guess<<endl;
-  cout << "Es_new= "<<Es_guess<<endl;
-  cout << "iter = "<<iter<<endl;
-  cout << "  " << endl;
- */
- 
+  //string thisdate=tt.date_string;
+  //string thishour=DecDaysToHours(tt.julian_day);
+  //if (iter>25){cout<<"Name: "<<pRes->GetReservoirName()<<" Date: "<<thisdate<<" Hour: "<<thishour<<endl;}
+
   Res_mass  =E_guess;
   ResSedMass=Es_guess;
   
@@ -1350,7 +1293,7 @@ void CEnthalpyModel::WriteMinorOutput(const optStruct& Options,const time_struct
   int    p;
   double Q_sens,Q_lat,Q_GW,Q_sw_in,Q_lw_in,Q_lw_out,Q_fric,Q_rain,Q_adv,Tave;
   double Q_cond, Q_conv, Q_lateral;
-  double Ri, N2, kdiff;
+  double kdiff;
   double Ein,Eout,mult;
   CSubBasin *pSB;
 

@@ -428,6 +428,7 @@ struct global_struct
   double           GAMMA_SHAPE_multiplier;   ///< [0..1+] Gamma shape multiplier
   double           GAMMA_SCALE_multiplier;   ///< [0..1+] Gamma scale multiplier
   double           mix_depth_coef;           ///< [m] Reservoir mixing depth coefficient
+  double           lake_lyr_conv_coeff_max;  ///< [MJ/m2/d/K] Upper limit for convection coefficient between lake layers
   double           mix_depth_expn;           ///< [-] Reservoir mixing depth exponent
   double           assimilation_fact;        ///< [0..1] assimilation factor (0=no assimilation to 1= full replacement)
   double           assim_upstream_decay;     ///< [1/km] assimilation upstream decay factor (0= overrides everything upstream, large- observation influence decays quickly with distance from gauge) [~0.01]

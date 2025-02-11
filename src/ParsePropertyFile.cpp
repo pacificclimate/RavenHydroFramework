@@ -174,6 +174,9 @@ bool ParseClassPropertiesFile(CModel         *&pModel,
   aP [0]="MIX_DEPTH_EXPN"; aPC[0]=CLASS_GLOBAL;
   AddToMasterParamList(aPmaster, aPCmaster,nPmaster, aP, aPC, 1);
 
+  aP [0]="KDIFF_MAX"; aPC[0]=CLASS_GLOBAL;
+  AddToMasterParamList(aPmaster, aPCmaster,nPmaster, aP, aPC, 1);
+
   //Throw warning if NULL Terrain but terrain parameter is needed
   terrain_required=false;
   for(int p=0;p<nPmaster;p++)
