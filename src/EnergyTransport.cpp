@@ -281,26 +281,26 @@ double CEnthalpyModel::GetEnergyLossesFromLake(const int     p,
   CHydroUnit* pHRU=_pModel->GetHydroUnit(pRes->GetHRUIndex());
 
   double V_new = pRes->GetStorage();
+  if(V_new<=0.0) { //handles dried out reservoir/lake
+    Q_sens = Q_conv = Q_sw_in = Q_lw_in = Q_lw_out = Q_lat = Q_rain = Q_adv = kdiff = 0.0;
+    return(0.0);
+  }
+  bool isShallow = false;
   double A_new = pRes->GetSurfaceArea();
+  double A_h_new = A_new;
   double V_h_new = pRes->GetHypolimnionStorage();
   double V_h_old = pRes->GetOldHypolimnionStorage();
-  double V_e_new = V_new-V_h_new;
-  double A_h_new = pRes->GetMixingArea();
-  double zm = pRes->GetMixingDepth();
-  
-  double Q_dn_new(0),Q_up_new(0);
-  double Q_vert = (V_h_new - V_h_old)/tstep; 
-  if (Q_vert> 0){
-    Q_dn_new = Q_vert; Q_up_new = 0.0;
-  } else {
-    Q_dn_new = 0.0; Q_up_new = -Q_vert;
+  if((V_h_old<=0.0) || (V_h_new<=0.0)) { //handles shallow lake, i.e. no hypolimnion layer
+    isShallow = true;
+    V_h_new = 0.0;
   }
-
+  double V_e_new = V_new-V_h_new;
+  double Q_dn(0.0),Q_up(0.0);
   double Acorr=1.0;
   double SW(0), LW(0), LW_in(0), temp_air(0), AET(0);
-  double hstar(0), ksed(0), Vsed=0.001;
+  double hstar(0);
   double T_new =ConvertVolumetricEnthalpyToTemperature(_aMres[p] / V_e_new);
-  double Ts_new=ConvertVolumetricEnthalpyToTemperature(_aMsed[p] / V_h_new );
+  double Ts_new=0.0;
  
   if(pHRU!=NULL) { //otherwise only simulate advective mixing+rain input
     Acorr    =pHRU->GetArea()*M2_PER_KM2/A_new; //handles the fact that GetAET() returns mm/d normalized by HRU area, not actual area
@@ -310,11 +310,20 @@ double CEnthalpyModel::GetEnergyLossesFromLake(const int     p,
     LW       =-STEFAN_BOLTZ*EMISS_WATER*pow(T_new+ZERO_CELSIUS,4);                  //[MJ/m2/d]
     AET      =pRes->GetAET()*Acorr/ MM_PER_METER ;                                  //[m/d] //*pHRU->GetArea()/A_avg
     hstar    =pRes->GetLakeConvectionCoeff();                                       //[MJ/m2/d/K]
-    Vsed     =pRes->GetLakebedThickness() * pHRU->GetArea()*M2_PER_KM2;
-    ksed     =pRes->GetLakebedConductivity() / 0.5 / pRes->GetLakebedThickness();   //[MJ/m2/d/K]
-  }
-  kdiff = pRes->GetLakeLyrConvectionCoeff();        //[MJ/m2/d/K]
 
+     // Shallow lake; model as lake layer + sediment layer; volume of second layer is sediment volume
+    if(isShallow) {
+      V_h_new = pRes->GetLakebedThickness() * pHRU->GetArea()*M2_PER_KM2;
+    } else {
+      A_h_new = pRes->GetMixingArea();
+      Q_dn = pRes->GetOldDownwardFlowRate();
+      Q_up = pRes->GetOldUpwardFlowRate();
+    }
+  } else {
+    V_h_new = 0.001;
+  }
+  Ts_new=ConvertVolumetricEnthalpyToTemperature(_aMsed[p] / V_h_new );
+  
   Q_sens  =hstar * A_new * (temp_air - T_new);                         //[MJ/d]
   Q_conv  =kdiff * A_h_new * (Ts_new - T_new);                         //[MJ/d]
   Q_sw_in =(SW      )*A_new;                                           //[MJ/d]
@@ -322,9 +331,8 @@ double CEnthalpyModel::GetEnergyLossesFromLake(const int     p,
   Q_lw_out=(LW      )*A_new;                                           //[MJ/d]
   Q_lat   =-(AET * DENSITY_WATER * LH_VAPOR)*A_new;                    //[MJ/d]
   Q_rain  =_aMresRain[p];                                              //[MJ/d]
-  Q_adv   = (Q_up_new*_aMsed[p]/V_e_new - Q_dn_new*_aMres[p]/V_h_new); //[MJ/d]
+  Q_adv   = (Q_up*_aMsed[p]/V_e_new - Q_dn*_aMres[p]/V_h_new);         //[MJ/d]
 
-  //return -(Q_sens + Q_cond  + Q_sw_in + Q_lw_in + Q_lw_out +  Q_lat + Q_rain) * tstep; //[MJ]
   return -(Q_sens + Q_sw_in + Q_lw_in + Q_lw_out +  Q_lat + Q_rain) * tstep; //[MJ]
 }
 
@@ -348,133 +356,126 @@ void   CEnthalpyModel::RouteMassInReservoir   (const int          p,          //
   CSubBasin *pBasin= _pModel->GetSubBasin(p);
   CReservoir* pRes = _pModel->GetSubBasin(p)->GetReservoir();
   int nSegments    = _pModel->GetSubBasin(p)->GetNumSegments();
-
+  double tstep=Options.timestep;
+  
   double V_new = pRes->GetStorage();
   double V_old = pRes->GetOldStorage();
+  if((V_old<=0.0) || (V_new<=0.0)) { //handles dried out reservoir/lake
+    pRes->SetLakeLyrConvectionCoeff(0.0);
+    pRes->SetOldDownwardFlowRate(0.0);
+    pRes->SetOldUpwardFlowRate(0.0);
+    Res_mass=ResSedMass=0.0;
+    return;
+  }
   
-  if((V_old<=0.0) || (V_new<=0.0)) { Res_mass=ResSedMass=0.0; return;} //handles dried out reservoir/lake
-  
+  bool isShallow = false;
   double V_h_new = pRes->GetHypolimnionStorage();
   double V_h_old = pRes->GetOldHypolimnionStorage();
+  if((V_h_old<=0.0) || (V_h_new<=0.0)) {  //handles shallow lake, i.e. no hypolimnion layer
+    isShallow = true;
+    V_h_old = V_h_new = 0.0;
+  }
   double V_e_new = V_new-V_h_new;
   double V_e_old = V_old-V_h_old;
-  double Q_new = pRes->GetOutflowRate() * SEC_PER_DAY;
-  double Q_old = pRes->GetOldOutflowRate() * SEC_PER_DAY;
-  double Q_dn_old = pRes->GetOldDownwardFlowRate();
-  double Q_up_old = pRes->GetOldUpwardFlowRate();
   double A_new = pRes->GetSurfaceArea();
   double A_old = pRes->GetOldSurfaceArea();
-  double A_avg = 0.5 * (A_new + A_old);
-  double A_h_new = pRes->GetMixingArea();
-  double A_h_old = pRes->GetOldMixingArea();
-  double A_h_avg = 0.5 * (A_h_new + A_h_old);
-  double zm = pRes->GetMixingDepth();
-  double kdiff_max = _pModel->GetGlobalParams()->GetParams()->lake_lyr_conv_coeff_max;
-  
-  double tstep=Options.timestep; 
-  
-  double Q_dn_new(0), Q_up_new(0);
-  double Q_vert = (V_h_new - V_h_old)/tstep; 
-  if (Q_vert> 0){
-    Q_dn_new = Q_vert; Q_up_new = 0.0;
-  } else {
-    Q_dn_new = 0; Q_up_new = -Q_vert;
-  }
+  double A_avg = 0.5 * (A_new + A_old); 
+  double Q_new = pRes->GetOutflowRate() * SEC_PER_DAY;
+  double Q_old = pRes->GetOldOutflowRate() * SEC_PER_DAY;
+  double A_h_new(0.0), A_h_old(0.0);
+  double A_h_avg = A_avg;
+  double Q_dn_old(0.0), Q_up_old(0.0);
+  double Q_dn_new(0.0), Q_up_new(0.0);
+  double Q_vert(0.0);
+  double zm(0.0),zc(0.0);
 
   CHydroUnit*   pHRU=_pModel->GetHydroUnit(pRes->GetHRUIndex());
+  double kdiff_max = _pModel->GetGlobalParams()->GetParams()->lake_lyr_conv_coeff_max;
   double Acorr=1.0;
-  double T_old    =ConvertVolumetricEnthalpyToTemperature(_aMres[p]/V_e_old);
-  double Ts_old   =ConvertVolumetricEnthalpyToTemperature(_aMsed[p]/V_h_old);
-
-  double SW(0), LW(0), LW_in(0), temp_air(0), AET(0);
-  double hstar(0); // ksed=0.0, Vsed=0.001;
-  double dens_e(0), dens_h(0);                     //Water density in each layer [kg/m3]
-  double N2 = 5.0E-12;                             //Brunt-Väisälä frequency when dens_e >= dens_h [1/s2]
+  double T_old  = ConvertVolumetricEnthalpyToTemperature(_aMres[p]/V_e_old);
+  double Ts_old = 0.0;
+  double hstar(0.0),kstar(0.0),wstar(0.0),Ri(0.0);
+  double Ke(0.0),Ked(0.0),Km(0.0),kdiff(0.0);      //Diffusion coefficient [MJ/m2/K/d]
+  double md = 1.0;                                 //Diffusion scaling factor in each layer
+  double SW(0), LW(0), LW_in(0), temp_air(0), AET(0), u2(0);
+  double a0 = -1.954e-5;
+  double dens_e(0), dens_h(0);                      //Water density in each layer [kg/m3]
+  double N2 = 5.0E-12;                              //Brunt-Väisälä frequency when dens_e >= dens_h [1/s2]
   
-  if(pHRU!=NULL) { //otherwise only simulate advective mixing+ rain input
+  if(pHRU!=NULL) { //otherwise only simulate advective mixing + rain input
     Acorr    =pHRU->GetArea()*M2_PER_KM2/A_avg;                           //handles the fact that GetAET() returns mm/d normalized by HRU area, not actual area
     temp_air =pHRU->GetForcingFunctions()->temp_ave;                      //[C]
     SW       =pHRU->GetForcingFunctions()->SW_radia_net;                  //[MJ/m2/d]
     LW_in    =pHRU->GetForcingFunctions()->LW_incoming;                   //[MJ/m2/d]
     LW       =-STEFAN_BOLTZ*EMISS_WATER*pow(T_old+ZERO_CELSIUS,4);        //[MJ/m2/d] //TMP DEBUG -time-lagged - should include in the N-R formulation
     AET      =pRes->GetAET()*Acorr/ MM_PER_METER ;                        //[m/d]
-//  Vsed     =pRes->GetLakebedThickness() * pHRU->GetArea()*M2_PER_KM2;
     hstar    =pRes->GetLakeConvectionCoeff();                             //[MJ/m2/d/K]
-//  ksed     =pRes->GetLakebedConductivity()/0.5/ pRes->GetLakebedThickness();//[MJ/m2/d/K]
-  }
+    
+    // Shallow lake; model as lake layer + sediment layer; volume of second layer is sediment volume
+    if(isShallow) {
+      V_h_old = V_h_new = pRes->GetLakebedThickness() * pHRU->GetArea()*M2_PER_KM2;
+      Ts_old  = ConvertVolumetricEnthalpyToTemperature(_aMsed[p]/V_h_old);
+      kdiff   = pRes->GetLakebedConductivity()/0.5/ pRes->GetLakebedThickness();//[MJ/m2/d/K]
   
-  //Water density in each layer as a function of water temperature. Reference:
-  // (Hostetler and Bartlein, 1990)
-  double a0 = -1.954e-5;
-  dens_e = DENSITY_WATER*(1.0+a0*pow(abs((T_old  + ZERO_CELSIUS)-277.0),1.68));
-  dens_h = DENSITY_WATER*(1.0+a0*pow(abs((Ts_old + ZERO_CELSIUS)-277.0),1.68));
-  
-   //Estimate layer thicknesses
-  double Ze = V_e_old/A_old;                        //Average epilimnion thickness  [m]
-  double Zh = V_h_old/A_h_old;                      //Average hypolimnion thickness [m]
-  double Zc = (Ze+Zh)/2.0;                          //Characteristic length         [m]
-  
-  //Estimate density gradient dp/dz over length Zc, and Brunt-Väisälä frequency across
-  // the thermocline depth (Jennings et al. 2012)
-  if(dens_e<dens_h){
-    N2 = -1*GRAVITY/dens_e*(dens_e-dens_h)/Zc;
-  }
-  
-  ///////////// Estimate layer convection/diffusion coefficient
-  /// Option 1 --> Vertical convection coefficient as function of N2 (Quay et el. 1980; Figure 10)
-  //double vdiff(0.0), kdiff(0.0);
-  //double m = -0.65;
-  //double b = -3.1;
-  //vdiff = pow(10,m*log10(N2)+b)/100/100;
-  //kdiff = vdiff*HCP_WATER*SEC_PER_DAY;
-  /////////////////
+    // Deep lake with epilimnion + hypolimnion layers (no sediment layer)
+    // kdiff = md*(Ke+Ked+Km) as per Community Land Model v5 (Lawrence et al, 2020)
+    } else { 
+      Ts_old = ConvertVolumetricEnthalpyToTemperature(_aMsed[p]/V_h_old);
+      A_h_new = pRes->GetMixingArea();
+      A_h_old = pRes->GetOldMixingArea();
+      A_h_avg = 0.5 * (A_h_new + A_h_old);
+      zc = ((V_e_old/A_old)+(V_h_old/A_h_old))/2.0;
+      zm = pRes->GetMixingDepth();
+      Q_dn_old = pRes->GetOldDownwardFlowRate();
+      Q_up_old = pRes->GetOldUpwardFlowRate();
+      Q_vert = (V_h_new - V_h_old)/tstep; 
+      Q_dn_new = threshMax( Q_vert, 0.0, 0.0);
+      Q_up_new = threshMax(-Q_vert, 0.0, 0.0);
+      
+      dens_e = DENSITY_WATER*(1.0+a0*pow(abs((T_old  + ZERO_CELSIUS)-277.0),1.68));
+      dens_h = DENSITY_WATER*(1.0+a0*pow(abs((Ts_old + ZERO_CELSIUS)-277.0),1.68));
+      if(dens_e<dens_h){
+        N2 = -1*GRAVITY/dens_e*(dens_e-dens_h)/zc;
+      }
+      
+      if(T_old > FREEZING_TEMP){
+        u2 = pHRU->GetForcingFunctions()->wind_vel;
+        wstar = 0.0012*u2;                                                     //Surface friction velocity [m/s]
+        kstar = 6.6*pow(u2, -1.84) * sqrt(abs(sin(pHRU->GetLatRad())));
+        Ri = 40.0*N2*pow(VON_KARMAN,2.0)*pow(zm,2.0);
+        Ri /= pow(wstar,2.0);
+        Ri /= exp(-2*kstar*zm);
+        Ri += 1.0;
+        Ri = (-1 + sqrt(Ri))/20.0;                                             // Richardson number
+        if(Ri < 1e+20){
+          Ke = VON_KARMAN*wstar*zm/(1.0 + 37.0*pow(Ri,2.0)) * exp(-kstar*zm);  //[m2/s]
+          Ke *= SEC_PER_DAY;                                                   //[m2/d]
+        }
+      }
+      
+      if (N2 >= 7.5e-5){
+        Ked = 1.04e-8 * pow(N2,-0.43)*SEC_PER_DAY;      //[m2/d]
+      }
 
-  /// Option 2 -->  kdiff = md*(Ke+Ked+Km) as per Community Land Model v5 (Lawrence et al, 2020)
-  double u2 = pHRU->GetForcingFunctions()->wind_vel;
-  double kstar = 0.0;
-  double wstar = 0.0;                              //Surface friction velocity [m/s]
-  double Ri = 0.0;                                 //Richardson number
-  double Ke(0.0),Ked(0.0),Km(0.0),kdiff(0.0);      //Diffusion coefficient [MJ/m2/K/d]
-  double md = 1.0;                                 //Diffusion scaling factor in each layer
-  
-  //Molecular diffusion coefficient, Km can be calculated as per Community Land Model v5
-  // (Lawrence et al, 2020)
-  Km = TC_WATER/HCP_WATER;                          // [m2/d]
-  
-  //Wind-driven eddy diffusion coefficient, Ke, calculated as per per Community Land
-  //Model v5 (Lawrence et al, 2020)
-  if(T_old > FREEZING_TEMP){
-    wstar = 0.0012*u2;                                                     //Surface friction velocity [m/s]
-    kstar = 6.6*pow(u2, -1.84) * sqrt(abs(sin(pHRU->GetLatRad())));
-    Ri = 40.0*N2*pow(VON_KARMAN,2.0)*pow(zm,2.0);
-    Ri /= pow(wstar,2.0);
-    Ri /= exp(-2*kstar*zm);
-    Ri += 1.0;
-    Ri = (-1 + sqrt(Ri))/20.0;                                             // Richardson number
-    if(Ri < 1e+20){
-      Ke = VON_KARMAN*wstar*zm/(1.0 + 37.0*pow(Ri,2.0)) * exp(-kstar*zm);  //[m2/s]
-      Ke *= SEC_PER_DAY;                                                   //[m2/d]
+      if ((zc) >= 25.0){
+        //md = 10.0;                                      //Diffusion scaling factor
+        md = 1.0;
+      }  
+      
+      Km = TC_WATER/HCP_WATER;                          // [m2/d]
+      
+      kdiff = threshMin(md*(Ke+Ked+Km)*HCP_WATER, kdiff_max, 0.0);  //[MJ/m2/K/d]
     }
+  } else {
+    // No surface energy balance or layer mixing; set nominal volume for second model layer
+    V_h_old = V_h_new = 0.001;
+    Ts_old = ConvertVolumetricEnthalpyToTemperature(_aMsed[p]/V_h_old);
   }
- 
-  //Enhanced diffusivity intended to represent unresolved mixing processes
-  if (N2 >= 7.5e-5){
-    Ked = 1.04e-8 * pow(N2,-0.43)*SEC_PER_DAY;      //[m2/d]
-  }
-  
-  //Increase the overall diffusivity for large lakes, intended to represent
-  //3-dimensional mixing processes such as caused by horizontal temperature
-  // gradient. Calculated as per Community Land Model v5 (Lawrence et al, 2020)
-  if ((Ze+Zh) >= 25.0){
-    //md = 10.0;                                      //Diffusion scaling factor
-    md = 1.0;
-  }
-  
-  //Final diffusion coefficient
-  kdiff = threshMin(md*(Ke+Ked+Km)*HCP_WATER, kdiff_max, 0.0);  //[MJ/m2/K/d]
-  ////////////////////////////////
   
   pRes->SetLakeLyrConvectionCoeff(kdiff);
+  pRes->SetOldDownwardFlowRate(Q_dn_new);
+  pRes->SetOldUpwardFlowRate(Q_up_new);
+  
   
   // N-R solution of Crank-nicolson problem as set of two non-linear algebraic equations [A][E]=[B]
   // -----------------------------------------------------------------------------------------
@@ -559,7 +560,7 @@ void   CEnthalpyModel::RouteMassInReservoir   (const int          p,          //
     //if (iter>2){cout<<"iter: "<<iter<<" change: "<<change<<" tol: "<<tolerance<<" dE: "<<dE<<" dEs: "<<dEs<<endl;}
 
     // Rough estimate of dE and dEs if numerical routine fails to converge
-    if (iter>25){
+    if (iter>10){
         // Estimate from most recent known values and best guess for current temperatures
         T_guess = ConvertVolumetricEnthalpyToTemperature(_aMres[p]/V_e_new);
         Ts_guess= ConvertVolumetricEnthalpyToTemperature(_aMsed[p]/V_h_new);
@@ -591,9 +592,6 @@ void   CEnthalpyModel::RouteMassInReservoir   (const int          p,          //
 
   Res_mass  =E_guess;
   ResSedMass=Es_guess;
-  
-  pRes->SetOldDownwardFlowRate(Q_dn_new);
-  pRes->SetOldUpwardFlowRate(Q_up_new);
 
   delete [] B;
   delete [] R;
