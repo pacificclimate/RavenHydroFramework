@@ -59,12 +59,14 @@ public:/*-------------------------------------------------------*/
   double GetWaterTemperature     (const double *state_vars, const int iWater) const;
 
   double GetEnergyLossesInTransit(const int p,double &Q_sens,double &Q_GW) const;
-  double GetEnergyLossesFromLake (const int p,double &Q_sens,double &Q_cond,double &Q_lat,double &Q_rad_in,double &Q_lw_in, double &Q_lw_out, double &Q_rain, double &Q_adv, double &kdiff) const;
+  double GetEnergyLossesFromLake (const int p,double &Q_sens,double &Q_cond,double &Q_lat,double &Q_rad_in,double &Q_lw_in, double &Q_lw_out, double &Q_rain, double &Q_adv) const;
   double GetEnergyLossesFromReach(const int p,double &Q_sens,double &Q_cond,double &Q_lat,double &Q_GW,double &Q_rad_in,double &Q_lw_in, double &Q_lw_out,double &Q_lateral, double &Q_fric, double &Tave) const;
 
   double GetOutflowIceFraction   (const int p) const;
   double GetAvgLatentHeatFlux    () const;
   double GetDirichletEnthalpy    (const CHydroUnit *pHRU, const double &Cs) const;
+  
+  double GetReservoirDiffusivity (const double &T1, const double &T2, const double &u2, const double &zm, const double &zc, const double &lat) const;
 
   //Manipulators
   //

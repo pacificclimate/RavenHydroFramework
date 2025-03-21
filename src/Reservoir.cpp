@@ -24,7 +24,7 @@ void CReservoir::BaseConstructor(const string Name,const long SubID)
   _lakebed_thick=1.0;
   _lakebed_cond =0.0;
   _lake_convcoeff=2.0;
-  _lake_lyr_convcoeff=0.0;
+  _lake_conductivity=0.0;
 
   _stage     =0.0;
   _stage_last=0.0;
@@ -520,9 +520,9 @@ double  CReservoir::GetLakebedConductivity() const { return _lakebed_cond; }
 double  CReservoir::GetLakeConvectionCoeff() const { return _lake_convcoeff; }
 
 //////////////////////////////////////////////////////////////////
-/// \returns lake between-layer thermal convection coefficient [MJ/m2/d/K]
+/// \returns lake/reservor body thermal conductivity [MJ/m2/d/K]
 //
-double  CReservoir::GetLakeLyrConvectionCoeff() const { return _lake_lyr_convcoeff; }
+double  CReservoir::GetLakeThermalConductivity() const { return _lake_conductivity; }
 
 //////////////////////////////////////////////////////////////////
 /// \returns current outflow rate [m3/s]
@@ -1050,8 +1050,8 @@ void CReservoir::SetLakeConvectionCoeff(const double& conv) {
 //////////////////////////////////////////////////////////////////
 /// \brief sets lake between-layer convection coeff
 //
-void CReservoir::SetLakeLyrConvectionCoeff(const double& conv) {
-  _lake_lyr_convcoeff=conv;
+void CReservoir::SetLakeThermalConductivity(const double& cond) {
+  _lake_conductivity=cond;
 }
 //////////////////////////////////////////////////////////////////
 /// \brief gets current constraint name

@@ -60,7 +60,7 @@ private:/*-------------------------------------------------------*/
   double       _lakebed_thick;       ///< lakebed thickness [m]
   double       _lakebed_cond;        ///< lakebed thermal conductivity [MJ/m/K/d]
   double       _lake_convcoeff;      ///< lake surface thermal convection coefficient [MJ/m2/d/K]
-  double       _lake_lyr_convcoeff;  ///< lake between-layer thermal convection coefficient  [MJ/m2/d/K]
+  double       _lake_conductivity;   ///< thermal conductivy in water body  [MJ/m2/d/K]
 
   const CHydroUnit  *_pHRU;          ///< (potentially zero-area) HRU used for Precip/ET calculation (or NULL for no ET)
 
@@ -208,7 +208,7 @@ public:/*-------------------------------------------------------*/
   double            GetLakebedThickness      () const; //[m]
   double            GetLakebedConductivity   () const; //[MJ/m/K/d]
   double            GetLakeConvectionCoeff   () const; //[MJ/m2/d/K]
-  double            GetLakeLyrConvectionCoeff() const; //[MJ/m2/d/K]
+  double            GetLakeThermalConductivity() const; //[MJ/m2/d/K]
   double            GetDischargeFromStage    (const double &stage, const int nn) const; //[m3/s]
   double            GetStageDischargeDerivative(const double &stage,const int nn) const; //[m3/s/d]
   double            GetMinStage              (const int nn) const;//[m]
@@ -254,7 +254,7 @@ public:/*-------------------------------------------------------*/
   void              SetLakebedThickness      (const double &thick);
   void              SetLakebedConductivity   (const double &cond);
   void              SetLakeConvectionCoeff   (const double &conv);
-  void              SetLakeLyrConvectionCoeff(const double &conv);
+  void              SetLakeThermalConductivity(const double &conv);
   void              SetOldUpwardFlowRate     (const double &Q_up);
   void              SetOldDownwardFlowRate   (const double &Q_dn);
 
