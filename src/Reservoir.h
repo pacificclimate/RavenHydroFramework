@@ -166,17 +166,17 @@ public:/*-------------------------------------------------------*/
              const double a_A, const double b_A,
              const double crestht, const double depth,
              const CModelABC* pModel);
-  CReservoir(const string name, const long SubID,
+  CReservoir(const string name, const long long SubID,
              const double *a_ht,
              const double *a_Q, const double *aQ_und,const double *a_A, const double *a_V,
              const int     nPoints,
              const CModelABC* pModel);
-  CReservoir(const string Name, const long SubID,
+  CReservoir(const string Name, const long long SubID,
              const int nDates, const int *aDates, const double *a_ht,
              double **a_QQ, const double *aQ_und, const double *a_A, const double *a_V,
              const int     nPoints,
              const CModelABC* pModel);
-  CReservoir(const string Name, const long SubID, const double weircoeff, //Lake constructor
+  CReservoir(const string Name, const long long SubID, const double weircoeff, //Lake constructor
              const double crestw, const double crestht, const double A, const double depth,const CModelABC* pModel);
   ~CReservoir();
 
