@@ -25,9 +25,9 @@ LDFLAGS  :=
 # OPTION 0) some compilers require the c++11 flag, some may not
 CXXFLAGS += -std=c++11 -fPIC
 
-# OPTION 1) include netcdf - uncomment following two commands (assumes netCDF path = /usr/local):
-#CXXFLAGS += -Dnetcdf
-#LDLIBS   += -L/usr/local -lnetcdf
+# OPTION 1) include netcdf - uncomment following two commands (assumes netCDF path = /usr/local): 
+CXXFLAGS += -Dnetcdf     
+LDLIBS   += -L/usr/local -lnetcdf  
 
 # OPTION 1b) include netcdf - for newer MacOS with Apple Silicon (use with option 1 also uncommented)
 #CXXFLAGS += -I/opt/homebrew/include

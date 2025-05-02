@@ -55,10 +55,12 @@ private:/*-------------------------------------------------------*/
   string       _name;                ///< reservoir name
   long long    _SBID;                ///< subbasin ID
   double       _max_capacity;        ///< maximum reservoir capacity [m3]
+  double       _mixing_depth;
 
   double       _lakebed_thick;       ///< lakebed thickness [m]
   double       _lakebed_cond;        ///< lakebed thermal conductivity [MJ/m/K/d]
   double       _lake_convcoeff;      ///< lake surface thermal convection coefficient [MJ/m2/d/K]
+  double       _lake_lyr_convcoeff;  ///< lake between-layer thermal convection coefficient  [MJ/m2/d/K]
 
   const CHydroUnit  *_pHRU;          ///< (potentially zero-area) HRU used for Precip/ET calculation (or NULL for no ET)
 
@@ -107,6 +109,8 @@ private:/*-------------------------------------------------------*/
   double       _stage_last;          ///< stage at beginning of current time step [m]
   double       _Qout;                ///< outflow corresponding to current stage [m3/s]
   double       _Qout_last;           ///< outflow at beginning of current time step [m3/s]
+  double       _Q_dn_old;            ///< downward flow between layers at beginning of current time step [m3/d]
+  double       _Q_up_old;            ///< upward flow between layers at beginning of current time step [m3/d]
   double       _MB_losses;           ///< losses over current time step [m3]
   double       _AET;                 ///< losses through AET only [m3]
   double       _Precip;              ///< gains through precipitation [m3]
@@ -160,17 +164,20 @@ public:/*-------------------------------------------------------*/
              const double a_v, const double b_v,
              const double a_Q, const double b_Q,
              const double a_A, const double b_A,
-             const double crestht, const double depth);
-  CReservoir(const string name, const long long SBID,
+             const double crestht, const double depth,
+             const CModelABC* pModel);
+  CReservoir(const string name, const long SubID,
              const double *a_ht,
              const double *a_Q, const double *aQ_und,const double *a_A, const double *a_V,
-             const int     nPoints);
-  CReservoir(const string Name, const long long SBID,
+             const int     nPoints,
+             const CModelABC* pModel);
+  CReservoir(const string Name, const long SubID,
              const int nDates, const int *aDates, const double *a_ht,
              double **a_QQ, const double *aQ_und, const double *a_A, const double *a_V,
-             const int     nPoints);
-  CReservoir(const string Name, const long long SBID, const double weircoeff, //Lake constructor
-             const double crestw, const double crestht, const double A, const double depth);
+             const int     nPoints,
+             const CModelABC* pModel);
+  CReservoir(const string Name, const long SubID, const double weircoeff, //Lake constructor
+             const double crestw, const double crestht, const double A, const double depth,const CModelABC* pModel);
   ~CReservoir();
 
   //Accessors
@@ -179,10 +186,14 @@ public:/*-------------------------------------------------------*/
 
   double            GetStorage               () const; //[m3]
   double            GetOldStorage            () const; //[m3]
+  double            GetHypolimnionStorage    () const; //[m3]
+  double            GetOldHypolimnionStorage () const; //[m3]
   double            GetOutflowRate           () const; //[m3/s]
   double            GetOldOutflowRate        () const; //[m3/s]
   double            GetIntegratedOutflow     (const double &tstep) const; //[m3]
   double            GetControlOutflow        (const int i) const; //[m3]
+  double            GetOldUpwardFlowRate     () const; //[m3/d]
+  double            GetOldDownwardFlowRate   () const; //[m3/d]
   double            GetIntegratedControlOutflow(const int i, const double& tstep) const; //[m3]
   double            GetReservoirLosses       (const double &tstep) const; //[m3]
   double            GetReservoirEvapLosses   (const double &tstep) const; //[m3]
@@ -192,14 +203,18 @@ public:/*-------------------------------------------------------*/
   double            GetOldStage              () const; //[m]
   double            GetSurfaceArea           () const; //[m2]
   double            GetOldSurfaceArea        () const; //[m2]
+  double            GetMixingArea            () const; //[m2]
+  double            GetOldMixingArea         () const; //[m2]
   double            GetLakebedThickness      () const; //[m]
   double            GetLakebedConductivity   () const; //[MJ/m/K/d]
   double            GetLakeConvectionCoeff   () const; //[MJ/m2/d/K]
+  double            GetLakeLyrConvectionCoeff() const; //[MJ/m2/d/K]
   double            GetDischargeFromStage    (const double &stage, const int nn) const; //[m3/s]
   double            GetStageDischargeDerivative(const double &stage,const int nn) const; //[m3/s/d]
   double            GetMinStage              (const int nn) const;//[m]
   double            GetMaxStage              (const int nn) const;//[m]
   double            GetSillElevation         (const int nn) const;//[m]
+  double            GetMixingDepth           () const; //[m]
 
   int               GetNumWaterDemands       () const;
   CDemand          *GetWaterDemandObj        (const int ii) const;
@@ -239,6 +254,9 @@ public:/*-------------------------------------------------------*/
   void              SetLakebedThickness      (const double &thick);
   void              SetLakebedConductivity   (const double &cond);
   void              SetLakeConvectionCoeff   (const double &conv);
+  void              SetLakeLyrConvectionCoeff(const double &conv);
+  void              SetOldUpwardFlowRate     (const double &Q_up);
+  void              SetOldDownwardFlowRate   (const double &Q_dn);
 
   void              AddDemand                (CDemand *pDemand);
 
