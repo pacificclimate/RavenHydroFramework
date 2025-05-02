@@ -1,6 +1,6 @@
 /*----------------------------------------------------------------
   Raven Library Source Code
-  Copyright (c) 2008-2024 the Raven Development Team
+  Copyright (c) 2008-2025 the Raven Development Team
   ----------------------------------------------------------------*/
 
 #include "RavenInclude.h"
@@ -108,8 +108,10 @@ bool ParseInputFiles (CModel      *&pModel,
     }
     ExitGracefully("Cannot find or read .rvi file",BAD_DATA);return false;
   }
-  if (!ParseNetCDFRunInfoFile(pModel, Options, runname_overridden,runmode_overridden)){
-    ExitGracefully("Cannot find or read NetCDF runinfo file", BAD_DATA); return false;
+  if (!Options.create_rvp_template) {//otherwise, jump right to parse rvp, where template is created
+    if (!ParseNetCDFRunInfoFile(pModel, Options, runname_overridden,runmode_overridden)){
+      ExitGracefully("Cannot find or read NetCDF runinfo file", BAD_DATA); return false;
+    }
   }
 
   // Class Property file (.rvp)
@@ -278,6 +280,7 @@ bool ParseMainInputFile (CModel     *&pModel,
   Options.keepUBCWMbugs           =false;
   Options.suppressCompetitiveET   =false;
   Options.snow_suppressPET        =false;
+  Options.allow_soil_overfill     =false;
   Options.pavics                  =false;
   Options.deltaresFEWS            =false;
   Options.res_overflowmode        =OVERFLOW_ALL;
@@ -323,7 +326,8 @@ bool ParseMainInputFile (CModel     *&pModel,
   Options.aNetCDFattribs          =NULL;
   Options.assimilate_flow         =false;
   Options.assimilate_stage        =false;
-  Options.assimilation_start      =-1.0;
+  Options.assim_method            =DA_RAVEN_DEFAULT;
+  Options.assimilation_start      =-1.0; //start before simulation
   Options.time_zone               =0;
   Options.rvl_read_frequency      =0.0; //do not read at all
   Options.custom_interval         =1.0; //daily
@@ -427,6 +431,8 @@ bool ParseMainInputFile (CModel     *&pModel,
     else if  (!strcmp(s[0],":EnsembleMode"              )){code=47; }
     else if  (!strcmp(s[0],":SuppressCompetitiveET"     )){code=48; }
     else if  (!strcmp(s[0],":SnowSuppressesPET"         )){code=49; }
+    else if  (!strcmp(s[0],":AllowSoilOverfill"         )){code=491;}
+
 	//---I/O------------------------------------------------------
     else if  (!strcmp(s[0],":DebugMode"                 )){code=50; }
     else if  (!strcmp(s[0],":BenchmarkingMode"          )){code=51; }
@@ -464,6 +470,7 @@ bool ParseMainInputFile (CModel     *&pModel,
     else if  (!strcmp(s[0],":AssimilationStartTime"     )){code=92; }
     else if  (!strcmp(s[0],":AssimilateStreamflow"      )){code=93; }
     else if  (!strcmp(s[0],":AssimilateReservoirStage"  )){code=94; }
+    else if  (!strcmp(s[0],":AssimilationMethod"        )){code=95; }
     else if  (!strcmp(s[0],":TimeZone"                  )){code=97; }
     else if  (!strcmp(s[0],":Alias"                     )){code=98; }
     else if  (!strcmp(s[0],":CustomOutput"              )){code=99; }
@@ -484,6 +491,7 @@ bool ParseMainInputFile (CModel     *&pModel,
     else if  (!strcmp(s[0],":rvg_Filename"              )){code=512;}//GWMIGRATE -TO REMOVE
 
 	  if       (in_ifmode_statement)                        {code=-6; }
+    else if  (Len==0)                                     {code=-1; }
     else if  (!strcmp(s[0],":rvh_Filename"              )){code=160;}
     else if  (!strcmp(s[0],":rvp_Filename"              )){code=161;}
     else if  (!strcmp(s[0],":rvt_Filename"              )){code=162;}
@@ -496,6 +504,7 @@ bool ParseMainInputFile (CModel     *&pModel,
     else if  (!strcmp(s[0],":WriteForcingFunctions"     )){code=171;}
     else if  (!strcmp(s[0],":WriteEnergyStorage"        )){code=172;}// OBSOLETE?
     else if  (!strcmp(s[0],":WriteReservoirMBFile"      )){code=173;}
+    else if  (!strcmp(s[0],":WriteSubBasinFile"         )){code=174;}
     else if  (!strcmp(s[0],":WriteSubbasinFile"         )){code=174;}
     else if  (!strcmp(s[0],":WriteDemandFile"           )){code=175;}
     else if  (!strcmp(s[0],":WriteChannelInfo"          )){code=176;}
@@ -517,6 +526,7 @@ bool ParseMainInputFile (CModel     *&pModel,
 
     //--------------------HYDROLOGICAL PROCESSES ---------------
     if       (in_ifmode_statement)                        {code=-6; }
+    else if  (Len==0)                                     {code=-1; }
     else if  (!strcmp(s[0],":HydrologicProcesses"       )){code=200;}//REQUIRED
     else if  (!strcmp(s[0],":HydrologicalProcesses"     )){code=200;}//REQUIRED
     else if  (!strcmp(s[0],":Baseflow"                  )){code=201;}
@@ -572,6 +582,7 @@ bool ParseMainInputFile (CModel     *&pModel,
     //...
     //--------------------TRANSPORT PROCESSES ---------------
     if       (in_ifmode_statement)                        {code=-6; }
+    else if  (Len==0)                                     {code=-1; }
     else if  (!strcmp(s[0],":Transport"                 )){code=300;}
     else if  (!strcmp(s[0],":FixedConcentration"        )){code=301; is_temp=false;}//After corresponding DefineHRUGroup(s) command, if used
     else if  (!strcmp(s[0],":FixedTemperature"          )){code=301; is_temp=true;}//After corresponding DefineHRUGroup(s) command, if used
@@ -1386,6 +1397,12 @@ bool ParseMainInputFile (CModel     *&pModel,
       Options.snow_suppressPET =true;
       break;
     }
+    case(491): //--------------------------------------------
+    {/*:AllowSoilOverfill */
+      if(Options.noisy) { cout <<"Allow soil compartments to overfill"<<endl; }
+      Options.allow_soil_overfill =true;
+      break;
+    }
     case(50):  //--------------------------------------------
     {/*:DebugMode */
       if (Options.noisy){cout <<"Debug Mode ON"<<endl;}
@@ -1498,8 +1515,10 @@ bool ParseMainInputFile (CModel     *&pModel,
         Options.main_output_dir=Options.output_dir;
         PrepareOutputdirectory(Options);
 
-        ofstream WARNINGS((Options.main_output_dir+"Raven_errors.txt").c_str());
+        ofstream WARNINGS((Options.main_output_dir+"Raven_errors.txt").c_str()); //This means RavenErrors.txt was also created in default directory
         WARNINGS.close();
+
+        WriteAdvisory("ParseInput: recommended practice is to specify the output directory from the command line, rather than using the :OutputDirectory command.",Options.noisy);
       }
       else {
         WriteWarning("ParseMainInputFile: :OutputDirectory command was ignored because directory was specified from command line.",Options.noisy);
@@ -1762,6 +1781,14 @@ bool ParseMainInputFile (CModel     *&pModel,
     {/*:AssimilatReservoirStage*/
       if(Options.noisy) { cout << "Assimilate lake stage on" << endl; }
       Options.assimilate_stage=true;
+      break;
+    }
+    case(95):  //--------------------------------------------
+    {/*:AssimilationMethod [method]*/
+      if(Options.noisy) { cout << "Assimilation Method" << endl; }
+      if (Len<2){ImproperFormatWarning(":AssimilationMethod",p,Options.noisy); break;}
+      if      (!strcmp(s[1],"DA_RAVEN_DEFAULT"        )){Options.assim_method=DA_RAVEN_DEFAULT;}
+      else if (!strcmp(s[1],"DA_ECCC"                 )){Options.assim_method=DA_ECCC;}
       break;
     }
     case(97):  //--------------------------------------------
@@ -2200,7 +2227,7 @@ bool ParseMainInputFile (CModel     *&pModel,
       else if (!strcmp(s[1],"INF_PRMS"        )){itype=INF_PRMS;      }
       else if (!strcmp(s[1],"INF_HBV"         )){itype=INF_HBV;       }
       else if (!strcmp(s[1],"INF_UBC"         )){itype=INF_UBC;       }
-      else if (!strcmp(s[1],"INF_PARTITION"   )){itype=INF_RATIONAL;  }
+      else if (!strcmp(s[1],"INF_PARTITION"   )){itype=INF_RATIONAL;  } //backward compatible
       else if (!strcmp(s[1],"INF_GR4J"        )){itype=INF_GR4J;      }
       else if (!strcmp(s[1],"INF_SCS"              )){itype=INF_SCS;       }
       else if (!strcmp(s[1],"INF_SCS_NOABSTRACTION")){itype=INF_SCS_NOABSTRACTION;  }
@@ -3531,6 +3558,13 @@ bool ParseMainInputFile (CModel     *&pModel,
   } //end while (!end_of_file)
   INPUT.close();
 
+  // Add TOTAL_SWE state variable if any snow is simulated
+  if (pModel->GetStateVarIndex(SNOW) != -1) {
+    tmpS[0] = TOTAL_SWE; tmpLev[0]=0; tmpN=1;
+    pModel->AddStateVariables(tmpS,tmpLev,tmpN);
+  }
+
+
   //===============================================================================================
   //Check input quality
   //===============================================================================================
@@ -3538,8 +3572,6 @@ bool ParseMainInputFile (CModel     *&pModel,
                    "ParseMainInputFile::Must have a postitive time step",BAD_DATA);
   ExitGracefullyIf(Options.duration<0,
                    "ParseMainInputFile::Model duration less than zero. Make sure :EndDate is after :StartDate.",BAD_DATA_WARN);
-  ExitGracefullyIf((pModel->GetStateVarIndex(CONVOLUTION,0)!=DOESNT_EXIST) && (pModel->GetTransportModel()->GetNumConstituents()>0),
-                   "ParseMainInputFile: cannot currently perform transport with convolution processes",BAD_DATA);
 
   if((Options.nNetCDFattribs>0) && (Options.output_format!=OUTPUT_NETCDF)){
     WriteAdvisory("ParseMainInputFile: NetCDF attributes were specified but output format is not NetCDF.",Options.noisy);
@@ -3703,6 +3735,7 @@ potmelt_method ParsePotMeltMethod(const string s)
 {
   string tmp=StringToUppercase(s);
   if      (!strcmp(tmp.c_str(),"POTMELT_DEGREE_DAY")){return POTMELT_DEGREE_DAY;}
+  else if (!strcmp(tmp.c_str(),"POTMELT_DD_FREEZE" )){return POTMELT_DD_FREEZE;}
   else if (!strcmp(tmp.c_str(),"POTMELT_EB"        )){return POTMELT_EB;}
   else if (!strcmp(tmp.c_str(),"POTMELT_RESTRICTED")){return POTMELT_RESTRICTED;}
   else if (!strcmp(tmp.c_str(),"POTMELT_DD_RAIN"   )){return POTMELT_DD_RAIN;}

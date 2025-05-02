@@ -1,6 +1,6 @@
 /*----------------------------------------------------------------
   Raven Library Source Code
-  Copyright (c) 2008-2024 the Raven Development Team
+  Copyright (c) 2008-2025 the Raven Development Team
 
   Includes declaration of global constants, enumerated types, and
   shared common & hydrological functions
@@ -99,7 +99,7 @@ extern double g_min_storage;      ///< minimum soil storage
 extern int    g_current_e;        ///< current ensemble member index
 
 // Model version
-const std::string __RAVEN_VERSION__   ="3.8.1";
+const std::string __RAVEN_VERSION__   ="4.0";
 //*****************************************************************
 // Global Constants
 //*****************************************************************
@@ -330,8 +330,8 @@ const bool    DESTRUCTOR_DEBUG    =false;       ///< if true, screen output is g
 const int     MAX_SV_LAYERS       =160;         ///< Max number of layers per state variable (greater than MAX_SOILLAYERS)
 const int     MAX_SOILLAYERS      =50;          ///< Max number of soil layers in profile
 const int     MAX_STATE_VAR_TYPES =100;         ///< Max number of *types* of state variables in model
-const int     MAX_STATE_VARS      =200;         ///< Max number of simulated state variables manipulable by one process (CAdvection worst offender)
-const int     MAX_CONNECTIONS     =200;         ///< Max number of to/from connections in any single process (CAdvection worst offender)
+const int     MAX_STATE_VARS      =500;         ///< Max number of simulated state variables manipulable by one process (CAdvection worst offender)
+const int     MAX_CONNECTIONS     =650;         ///< Max number of to/from connections in any single process (CAdvection worst offender)
 const int     MAX_LAT_CONNECTIONS =4000;        ///< Max number of lateral HRU flow connections
 const int     MAX_SOIL_PROFILES   =200;         ///< Max number of soil profiles
 const int     MAX_VEG_CLASSES     =200;         ///< Max number of vegetation classes
@@ -389,7 +389,7 @@ enum flux_method
 //
 enum routing_method
 {
-  ROUTE_NONE,            ///< No routing to be simulated
+  ROUTE_NONE,            ///< No in-channel routing to be simulated
   ROUTE_PLUG_FLOW,       ///< Plug flow routing - no dissipation of wave travelling at reach celerity
   ROUTE_MUSKINGUM,       ///< standard Muskingum algorithm
   ROUTE_MUSKINGUM_CUNGE, ///< Muskingum-Cunge algorithm
@@ -672,6 +672,7 @@ enum potmelt_method
   POTMELT_HMETS,            ///< From HMETS model (Martel et al., 2017)
   POTMELT_RILEY,            ///< From Riley et al., 1972, as reported in HYDROTEL 2.1 manual
   POTMELT_BLENDED,          ///< weighted average of multiple methods
+  POTMELT_DD_FREEZE,        ///< simple degree day with refreeze coefficient in winter
   POTMELT_NONE,             ///< Potential melt not calculated
   POTMELT_UNKNOWN           ///< special case - can't recognize melt method in input
 };
@@ -832,6 +833,12 @@ enum overflowmode
   OVERFLOW_ALL,     ///< calculates Q required to fix stage at max value
   OVERFLOW_NATURAL  ///< uses stage discharge curve to calculate Q
 };
+
+enum assimtype
+{
+  DA_RAVEN_DEFAULT, ///< multiplicative scaling assimilation upstream propagation
+  DA_ECCC           ///< additive assimilation upstream propagation
+};
 ////////////////////////////////////////////////////////////////////
 /// \brief Types of state variable
 /// \note If an additional state variable type is added, the following routines must be revised:
@@ -862,6 +869,7 @@ enum sv_type
   SNOW,                    ///< [mm] frozen snow depth (mm SWE : snow water equivalent)
   NEW_SNOW,                ///< [mm] new snowfall waiting to be handled by snow balance (as SWE)
   SNOW_LIQ,                ///< [mm] liquid water content of snowpack
+  TOTAL_SWE,               ///< [mm] equivalent to SNOW[0]+SNOW[1]+...+SNOW_LIQ[0]..
   WETLAND,                 ///< [mm] deep wetland depression storage
   GLACIER,                 ///< [mm] Glacier melt/reservoir storage
   GLACIER_ICE,             ///< [mm] Glacier ice - typically assumed to be infinite reservoir.
@@ -1112,6 +1120,7 @@ struct optStruct
   bool               keepUBCWMbugs;           ///< true if peculiar UBCWM bugs are retained (only really for BC Hydro use)
   bool               suppressCompetitiveET;   ///< true if competitive ET should be suppressed (for backward compatibility)
   bool               snow_suppressPET;        ///< true if presence of snow should set PET to zero
+  bool               allow_soil_overfill;     ///< true if soil can be filled above capacity (to be handled using overflow routine)
 
   // Soil model information
   int                num_soillayers;          ///< number of soil layers
@@ -1163,6 +1172,7 @@ struct optStruct
   bool             assimilate_flow;           ///< turn on streamflow assimilation
   bool             assimilate_stage;          ///< turn on lake stage assimilation
   double           assimilation_start;        ///< assimilation start time (in model time [d])
+  assimtype        assim_method;              ///< assimilation method
   bool             management_optimization;   ///< apply water management optimization (default: false)
   netcdfatt       *aNetCDFattribs;            ///< array of NetCDF attrributes {attribute/value pair}
   int              nNetCDFattribs;            ///< size of array of NetCDF attributes
@@ -1337,8 +1347,9 @@ void        JulianConvert(               double      model_time,
                                                      time_struct &tt);
 string      DecDaysToHours(        const double      dec_date,
                                    const bool        truncate=false);
-double      InterpolateMo(         const double      aVal[12],
-                                   const time_struct &tt,
+double      InterpolateMo(         const double          aVal[12],
+                                   const time_struct    &tt,
+                                   const monthly_interp &method,
                                    const optStruct   &Options);
 time_struct DateStringToTimeStruct(const string      sDate,
                                          string      sTime,

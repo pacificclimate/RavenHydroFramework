@@ -1,6 +1,6 @@
 /*----------------------------------------------------------------
   Raven Library Source Code
-  Copyright (c) 2008-2023 the Raven Development Team
+  Copyright (c) 2008-2025 the Raven Development Team
   ----------------------------------------------------------------*/
 #include <time.h>
 #include "RavenInclude.h"
@@ -70,6 +70,10 @@ int main(int argc, char* argv[])
   WARNINGS.open((Options.main_output_dir+"Raven_errors.txt").c_str());
   if (WARNINGS.fail()){
     ExitGracefully("Main::Unable to open Raven_errors.txt. Bad output directory specified?",RAVEN_OPEN_ERR);
+  }
+  if (Options.benchmarking){
+  WARNINGS<<" Raven v"+Options.version+" Build date: "<<RavenBuildDate<<endl;
+  WARNINGS<<"----------------------------------------------------------"<<endl;
   }
   WARNINGS.close();
 
@@ -227,7 +231,7 @@ void ProcessExecutableArguments(int argc, char* argv[], optStruct   &Options)
     }
     if ((word=="-p") || (word=="-h") || (word=="-t") || (word=="-e") || (word=="-c") || (word=="-o") ||
         (word=="-s") || (word=="-r") || (word=="-n") || (word=="-l") || (word=="-m") || (word=="-v") ||
-        (word=="-we")|| (word=="-tt")|| (i==argc))
+        (word=="-we")|| (word=="-tt")|| (word=="-template") || (i==argc))
     {
       if      (mode==0){
         Options.rvi_filename=argument+".rvi";
@@ -254,6 +258,7 @@ void ProcessExecutableArguments(int argc, char* argv[], optStruct   &Options)
       else if (mode==11){Options.run_mode =argument[0]; argument="";}
       else if (mode==12){Options.forecast_shift=s_to_d(argument.c_str()); argument=""; }
       else if (mode==13){Options.warm_ensemble_run=argument; argument=""; }
+      else if (mode==14){Options.create_rvp_template=true;   argument="";}
 
       if      (word=="-p"){mode=1; }
       else if (word=="-h"){mode=2; }
@@ -269,6 +274,7 @@ void ProcessExecutableArguments(int argc, char* argv[], optStruct   &Options)
       else if (word=="-m"){mode=11;}
       else if (word=="-tt"){mode=12; }
       else if (word=="-we"){mode=13; }
+      else if (word=="-template"){mode=14;}
       else if (word=="-v"){Options.pause=false; version_announce=true; mode=10;} //For PAVICS
     }
     else{

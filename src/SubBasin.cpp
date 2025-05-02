@@ -22,10 +22,10 @@
 /// \param gaged      [in] If true, hydrographs are generated
 /// \param is_conduit [in] if true, this is a conduit
 //
-CSubBasin::CSubBasin( const long           Identifier,
+CSubBasin::CSubBasin( const long long      Identifier,
                       const string         Name,
                       const CModelABC     *pMod,
-                      const long           down_ID,     //index of downstream SB, if <0, downstream outlet
+                      const long long      down_ID,     //index of downstream SB, if <0, downstream outlet
                       const CChannelXSect *pChan,       //Channel
                       const double         reach_len,   //reach length [m]
                       const double         Qreference,  //reference flow, m3/s [or AUTO_COMPUTE]
@@ -188,7 +188,7 @@ CSubBasin::~CSubBasin()
 /// \brief Returns subbasin ID
 /// \return subbasin ID
 //
-long                    CSubBasin::GetID               () const {return _ID;            }
+long long               CSubBasin::GetID               () const {return _ID;            }
 
 //////////////////////////////////////////////////////////////////
 /// \brief Returns global index p
@@ -218,7 +218,7 @@ double                  CSubBasin::GetDrainageArea     () const {return _drainag
 /// \brief Returns ID of downstream subbasin
 /// \return ID of downstream subbasin (or DOESNT_EXIST if there is none)
 //
-long                    CSubBasin::GetDownstreamID     () const {return _downstream_ID; }
+long long               CSubBasin::GetDownstreamID     () const {return _downstream_ID; }
 
 //////////////////////////////////////////////////////////////////
 /// \brief Returns reach length [m]
@@ -953,6 +953,16 @@ double CSubBasin::GetReferenceFlow() const
   return _Q_ref;
 }
 //////////////////////////////////////////////////////////////////
+/// \brief Returns time of concentration [d]
+/// \return  time of concentration [d] or AUTO_COMPUTE if not yet calculated
+//
+double CSubBasin::GetTimeOfConc() const
+{
+  return _t_conc;
+}
+
+
+//////////////////////////////////////////////////////////////////
 /// \brief Returns x-sect area at reference discharge [m^2]
 /// \return  x-sect area at reference discharge [m^2] or AUTO_COMPUTE if not yet calculated
 //
@@ -1365,8 +1375,9 @@ void CSubBasin::SetUnusableFlowPercentage(const double &val)
 /// \brief scales all internal flows by scale factor (for assimilation/nudging)
 /// \remark Messes with mass balance something fierce!
 /// \param &scale [in] Flow scaling factor
-/// \param &scale_last [in] True if Qlast should be scaled (overriding); false for no-data scaling
+/// \param &overriding [in] True if Qlast should be scaled (overriding); false for no-data scaling
 /// \param &tstep [in] time step [d]
+/// \param &t [in] - current model time
 /// \return volume added to system [m3]
 //
 double CSubBasin::ScaleAllFlows(const double &scale, const bool overriding, const double &tstep, const double &t)
@@ -1407,11 +1418,53 @@ double CSubBasin::ScaleAllFlows(const double &scale, const bool overriding, cons
   _rivulet_storage*=scale; va+=_rivulet_storage*sf;
   return va;
 }
+
+//////////////////////////////////////////////////////////////////
+/// \brief adjusts all internal flows by corresponding magnitude (for assimilation/nudging)
+/// \remark Messes with mass balance something fierce!
+/// \param &Qadjust [in] Qadjust
+/// \param &overriding [in] True if Qlast should be scaled (overriding); false for no-data scaling
+/// \param &tstep [in] time step [d]
+/// \return volume added to system [m3]
+///
+double CSubBasin::AdjustAllFlows(const double &adjust, const bool overriding, const double &tstep, const double &t)
+{
+  double va=0.0; //volume added [m3]
+
+  if(!overriding)
+  {
+    for(int n=0;n<_nQinHist; n++) {
+      _aQinHist[n]+=adjust*(_drainage_area-_basin_area)/_drainage_area; 
+      upperswap(_aQinHist[n],0.0);
+      va+=adjust*tstep*SEC_PER_DAY;
+    }
+    for(int i=0;i<_nSegments;i++) {
+      _aQout[i]+=adjust; upperswap(_aQout[i],0.0);
+      va+=adjust*tstep*SEC_PER_DAY;
+    }
+  }
+  else if((overriding) && (_pReservoir==NULL)) {
+    for (int i=0;i<_nSegments;i++)
+    {
+      _aQout[i]+=adjust;  upperswap(_aQout[i],0.0);
+      va+=adjust*tstep*SEC_PER_DAY;
+    }
+  }
+
+  if(_pReservoir!=NULL) {
+    va+=_pReservoir->ScaleFlow(adjust,overriding,tstep,t);
+  }
+
+  //Estivate volume added through scaling
+  //_channel_storage+=adjust*tstep*SEC_PER_DAY; //va+=_channel_storage*sf;
+  //_rivulet_storage+=adjust*tstep*SEC_PER_DAY; //va+=_rivulet_storage*sf;
+  return va;
+}
 /////////////////////////////////////////////////////////////////
 /// \brief Sets (i.e., overrides initial) Downstream ID (use sparingly!)
 /// \param down_SBID [in] ID of downstream subbasin
 //
-void CSubBasin::SetDownstreamID(const long down_SBID)
+void CSubBasin::SetDownstreamID(const long long down_SBID)
 {
   _downstream_ID=down_SBID;
 }
@@ -1569,9 +1622,6 @@ void CSubBasin::Initialize(const double    &Qin_avg,          //[m3/s] from upst
       }
       double mult=_pModel->GetGlobalParams()->GetParams()->reference_flow_mult;
       ResetReferenceFlow(mult*(Qin_avg+Qlat_avg)); //VERY APPROXIMATE - much better to specify!
-
-      //string advice="Reference flow in basin " +to_string(_ID)+" was estimated from :AvgAnnualRunoff to be "+to_string(_Q_ref) +" m3/s. (this will not be used in headwater basins)";
-      //WriteAdvisory(advice,false);
     }
     else{
       ResetReferenceFlow(_Q_ref);
@@ -1586,8 +1636,6 @@ void CSubBasin::Initialize(const double    &Qin_avg,          //[m3/s] from upst
     if (_reach_length==AUTO_COMPUTE)
     {
       _reach_length =pow(_basin_area,0.67)*M_PER_KM;//[m] // \ref from Grand river data, JRC 2010
-      string advice="Reach length in basin " +to_string(_ID)+" was estimated from basin area to be "+to_string(_reach_length/M_PER_KM) +" km. (this will not be used in headwater basins)" ;
-      WriteAdvisory(advice,false);
     }
 
     // Estimate reach routing params: t_peak, t_conc, gamma shape/scale
@@ -1595,12 +1643,8 @@ void CSubBasin::Initialize(const double    &Qin_avg,          //[m3/s] from upst
     ///< \ref from Williams (1922), as cited in Handbook of Hydrology, eqn. 9.4.3 \cite williams1922
     if (_t_conc==AUTO_COMPUTE)
     {
-      //_t_conc=14.6*_reach_length/M_PER_KM*pow(_basin_area,-0.1)*pow( [[AVERAGE VALLEY SLOPE???]],-0.2)/MIN_PER_DAY;
       _t_conc=0.76*pow(max(_basin_area,0.001),0.38)/HR_PER_DAY;// [d] \ref Austrailian Rainfall and runoff guidelines [McDermott and Pilgrim (1982)]
       _t_conc *= _pModel->GetGlobalParams()->GetParams()->TOC_multiplier;
-      //if (Options.catchment_routing!=ROUTE_NONE){
-      //  WriteAdvisory("Time of concentration has been estimated as "+to_string(_t_conc)+" days for basin "+to_string(_ID),false);
-      //}
     }
     if(Options.catchment_routing==ROUTE_GAMMA_CONVOLUTION ){_t_peak=AUTO_COMPUTE;}
     if(Options.catchment_routing==ROUTE_DUMP              ){_t_peak=AUTO_COMPUTE;}
@@ -1658,8 +1702,6 @@ void CSubBasin::Initialize(const double    &Qin_avg,          //[m3/s] from upst
     _pEnviroMinFlow->Initialize(Options.julian_start_day,Options.julian_start_year,Options.duration,Options.timestep,false,Options.calendar);
   }
   //must be initialized AFTER RVM FILE READ
-
-
 
   //QA/QC check of Muskingum parameters, if necessary
   //------------------------------------------------------------------------
@@ -2157,11 +2199,15 @@ double  CSubBasin::GetMuskingumK(const double &dx) const
 double  CSubBasin::GetMuskingumX(const double &dx) const
 {
   ///< X ranges from 0 to .5 \cite Maidment1993
-  ExitGracefullyIf(_pChannel==NULL,"CSubBasin::GetMuskingumX",BAD_DATA);
-  double bedslope=_slope;
-  if(_slope==AUTO_COMPUTE){bedslope=_pChannel->GetBedslope(); }//overridden by channel
+  if (_pChannel!=NULL){
+    double bedslope=_slope;
+    if(_slope==AUTO_COMPUTE){bedslope=_pChannel->GetBedslope(); }//overridden by channel
 
-  return max(0.0,0.5*(1.0-_Q_ref/bedslope/_w_ref/_c_ref/dx));//[m3/s]/([m]*[m/s]*[m])
+    return max(0.0,0.5*(1.0-_Q_ref/bedslope/_w_ref/_c_ref/dx));//[m3/s]/([m]*[m/s]*[m])
+  }
+  else {
+    ExitGracefully("CSubBasin::GetMuskingumX",BAD_DATA);return 0.0;
+  }
 }
 
 //This routine only used in TVD scheme

@@ -1,6 +1,6 @@
 /*----------------------------------------------------------------
   Raven Library Source Code
-  Copyright (c) 2008-2023 the Raven Development Team
+  Copyright (c) 2008-2025 the Raven Development Team
 
   Includes CModel routines for writing output headers and contents:
     CModel::CloseOutputStreams()
@@ -28,13 +28,13 @@ int  NetCDFAddMetadata  (const int fileid,const int time_dimid,                 
 int  NetCDFAddMetadata2D(const int fileid,const int time_dimid,int nbasins_dimid,string shortname,string longname,string units);
 void WriteNetCDFGlobalAttributes(const int out_ncid,const optStruct &Options,const string descript);
 void AddSingleValueToNetCDF     (const int out_ncid,const string &label,const size_t time_index,const double &value);
-void WriteNetCDFBasinList       (const int ncid,const int varid,const CModel* pModel,bool is_res,const optStruct &Options);
+void WriteNetCDFBasinList       (const int ncid,const int varid,const int varid_name,const CModel* pModel,bool is_res,const optStruct &Options);
 //////////////////////////////////////////////////////////////////
 /// \brief returns true if specified observation time series is the flow series for subbasin SBID
 /// \param pObs [in] observation time series
 /// \param SBID [in] subbasin ID
 //
-bool IsContinuousFlowObs(const CTimeSeriesABC *pObs,long SBID)
+bool IsContinuousFlowObs(const CTimeSeriesABC *pObs,long long SBID)
 {
  // clears up  terribly ugly repeated if statements
   if (pObs==NULL)                                   { return false; }
@@ -47,7 +47,7 @@ bool IsContinuousFlowObs(const CTimeSeriesABC *pObs,long SBID)
 /// \param pObs [in] observation time series
 /// \param SBID [in] subbasin ID
 //
-bool IsContinuousLevelObs(const CTimeSeriesABC *pObs,long SBID)
+bool IsContinuousLevelObs(const CTimeSeriesABC *pObs,long long SBID)
 {
  // clears up  terribly ugly repeated if statements
   if (pObs==NULL)                                   { return false; }
@@ -60,7 +60,7 @@ bool IsContinuousLevelObs(const CTimeSeriesABC *pObs,long SBID)
 /// \param pObs [in] observation time series
 /// \param SBID [in] subbasin ID
 //
-bool IsContinuousConcObs(const CTimeSeriesABC *pObs,const long SBID, const int c)
+bool IsContinuousConcObs(const CTimeSeriesABC *pObs,const long long SBID, const int c)
 {
  // clears up  terribly ugly repeated if statements
   if (pObs==NULL)                                   { return false; }
@@ -75,7 +75,7 @@ bool IsContinuousConcObs(const CTimeSeriesABC *pObs,const long SBID, const int c
 /// \param pObs [in] observation time series
 /// \param SBID [in] subbasin ID
 //
-bool IsContinuousStageObs(CTimeSeriesABC *pObs,long SBID)
+bool IsContinuousStageObs(CTimeSeriesABC *pObs,long long SBID)
 {
  // clears up  terribly ugly repeated if statements
   if (pObs==NULL)                                   { return false; }
@@ -88,7 +88,7 @@ bool IsContinuousStageObs(CTimeSeriesABC *pObs,long SBID)
 /// \param pObs [in] observation time series
 /// \param SBID [in] subbasin ID
 //
-bool IsContinuousInflowObs(CTimeSeriesABC *pObs, long SBID)
+bool IsContinuousInflowObs(CTimeSeriesABC *pObs, long long SBID)
 {
   if (pObs==NULL)                                   { return false; }
   if (pObs->GetLocID() != SBID)                     { return false; }
@@ -100,7 +100,7 @@ bool IsContinuousInflowObs(CTimeSeriesABC *pObs, long SBID)
 /// \param pObs [in] observation time series
 /// \param SBID [in] subbasin ID
 //
-bool IsContinuousNetInflowObs(CTimeSeriesABC *pObs, long SBID)
+bool IsContinuousNetInflowObs(CTimeSeriesABC *pObs, long long SBID)
 {
   if (pObs==NULL)                                   { return false; }
   if (pObs->GetLocID() != SBID)                     { return false; }
@@ -184,16 +184,11 @@ void CModel::WriteOutputFileHeaders(const optStruct &Options)
         ExitGracefully(("CModel::WriteOutputFileHeaders: unable to open output file "+tmpFilename+" for writing.").c_str(),FILE_OPEN_ERR);
       }
 
-      int iAtmPrecip=GetStateVarIndex(ATMOS_PRECIP);
+      int iCumPrecip=GetStateVarIndex(ATMOS_PRECIP);
       _STORAGE<<"time [d],date,hour,rainfall [mm/day],snowfall [mm/d SWE],Channel Storage [mm],Reservoir Storage [mm],Rivulet Storage [mm]";
       for (i=0;i<GetNumStateVars();i++){
-        if (CStateVariable::IsWaterStorage(_aStateVarType[i])){
-          if (i!=iAtmPrecip){
-            _STORAGE << "," << CStateVariable::GetStateVarLongName(_aStateVarType[i],
-                                                                   _aStateVarLayer[i],
-                                                                   _pTransModel) << " [mm]";
-            //_STORAGE<<","<<CStateVariable::SVTypeToString(_aStateVarType[i],_aStateVarLayer[i])<<" [mm]";
-          }
+        if ((CStateVariable::IsWaterStorage(_aStateVarType[i]) && (i!=iCumPrecip))){
+            _STORAGE << "," << CStateVariable::GetStateVarLongName(_aStateVarType[i],_aStateVarLayer[i],_pTransModel) << " [mm]";
         }
       }
       _STORAGE<<", Total [mm], Cum. Inputs [mm], Cum. Outflow [mm], MB Error [mm]"<<endl;
@@ -596,21 +591,42 @@ void CModel::WriteOutputFileHeaders(const optStruct &Options)
       if (HRUSTOR.fail()){
         ExitGracefully(("CModel::WriteOutputFileHeaders: Unable to open output file "+tmpFilename+" for writing.").c_str(),FILE_OPEN_ERR);
       }
-      int iAtmPrecip=GetStateVarIndex(ATMOS_PRECIP);
+      int iCumPrecip=GetStateVarIndex(ATMOS_PRECIP);
       HRUSTOR<<"time,date,hour,rainfall [mm/day],snowfall [mm/d SWE]";
       for (i=0;i<GetNumStateVars();i++){
-        if (CStateVariable::IsWaterStorage(_aStateVarType[i])){
-          if (i!=iAtmPrecip){
-            HRUSTOR << "," << CStateVariable::GetStateVarLongName(_aStateVarType[i],
-                                                                  _aStateVarLayer[i],
-                                                                  _pTransModel) << " [mm]";
-            //HRUSTOR<<","<<CStateVariable::SVTypeToString(_aStateVarType[i],_aStateVarLayer[i])<<" [mm]";
-          }
+        if ((CStateVariable::IsWaterStorage(_aStateVarType[i])) && (i!=iCumPrecip)){
+            HRUSTOR << "," << CStateVariable::GetStateVarLongName(_aStateVarType[i],_aStateVarLayer[i],_pTransModel) << " [mm]";
         }
       }
       HRUSTOR<<", Total [mm]"<<endl;
       HRUSTOR.close();
     }
+  }
+
+  // Assimilation adjustments
+  //--------------------------------------------------------------
+  if (Options.assimilate_flow){
+    ofstream ASSIM;
+    tmpFilename=FilenamePrepare("AssimilationAdjustments_BySubbasin.csv",Options);
+    ASSIM.open(tmpFilename.c_str());
+    if (ASSIM.fail()){
+      ExitGracefully(("CModel::WriteOutputFileHeaders: Unable to open output file "+tmpFilename+" for writing.").c_str(),FILE_OPEN_ERR);
+    }
+    ASSIM<<"time,date";
+    
+    for (int p = 0; p < _nSubBasins; p++) {
+      if((_pSubBasins[p]->IsGauged()) && (_pSubBasins[p]->IsEnabled())){
+        ASSIM<<","<<_pSubBasins[p]->GetID()<<" "; 
+      }
+    }
+    ASSIM<<endl;
+    for (int p = 0; p < _nSubBasins; p++) {
+      if((_pSubBasins[p]->IsGauged()) && (_pSubBasins[p]->IsEnabled())){
+        ASSIM<<", "; 
+      }
+    }
+    ASSIM<<endl;
+    ASSIM.close();
   }
 
   // Custom output files
@@ -1068,7 +1084,7 @@ void CModel::WriteMinorOutput(const optStruct &Options,const time_struct &tt)
 
     //ReservoirMassBalance.csv
     //----------------------------------------------------------------
-    if((Options.write_reservoirMB) && (Options.output_format!=OUTPUT_NONE))
+    if((Options.write_reservoirMB) && (Options.output_format==OUTPUT_STANDARD))
     {
       if((Options.period_starting) && (t==0)){}//don't write anything at time zero
       else{
@@ -1086,9 +1102,7 @@ void CModel::WriteMinorOutput(const optStruct &Options,const time_struct &tt)
           pSB=_pSubBasins[p];
           if((pSB->IsGauged()) &&  (pSB->IsEnabled()) && (pSB->GetReservoir()!=NULL))
           {
-            string name,constraint_str;
-            if(pSB->GetName()==""){ name=to_string(pSB->GetID()); }
-            else                  { name=pSB->GetName(); }
+            string constraint_str;
 
             stage         =pSB->GetReservoir()->GetResStage();//m
             area          =pSB->GetReservoir()->GetSurfaceArea();//m2
@@ -1211,7 +1225,7 @@ void CModel::WriteMinorOutput(const optStruct &Options,const time_struct &tt)
     //----------------------------------------------------------------
     if ((Options.write_forcings) && (Options.output_format==OUTPUT_STANDARD))
     {
-      if((Options.period_starting) && (t==0)){}//don't write anything at time zero
+      if(t==0){}//don't write anything at time zero
       else{
         force_struct *pFave;
         force_struct faveStruct = GetAverageForcings();
@@ -1299,6 +1313,24 @@ void CModel::WriteMinorOutput(const optStruct &Options,const time_struct &tt)
         HRUSTOR<<endl;
         HRUSTOR.close();
       }
+    }
+
+    // Assimilation adjustments
+    //--------------------------------------------------------------
+    if (Options.assimilate_flow){
+      ofstream ASSIM;
+      tmpFilename=FilenamePrepare("AssimilationAdjustments_BySubbasin.csv",Options);
+      ASSIM.open(tmpFilename.c_str(),ios::app);
+
+      ASSIM<<usetime<<","<<usedate;
+      for (int p = 0; p < _nSubBasins; p++) {
+        if((_pSubBasins[p]->IsGauged()) && (_pSubBasins[p]->IsEnabled())){
+          if (Options.assim_method==DA_ECCC){ASSIM<<","<<_aDAQadjust[p]<<" ";}
+          else                              {ASSIM<<","<<_aDAscale  [p]<<" ";}
+        }
+      }
+      ASSIM<<endl;
+      ASSIM.close();
     }
   } // end of write output interval if statement
 
@@ -1398,13 +1430,15 @@ void CModel::WriteMajorOutput(const time_struct &tt, string solfile, bool final)
   //--------------------------------------------------------------
   if (Options->write_basinfile){
     ofstream BAS;
+    bool has_obs;
     tmpFilename=FilenamePrepare("SubbasinProperties.csv",*_pOptStruct);
     BAS.open(tmpFilename.c_str());
     if(BAS.fail()) {
       WriteWarning(("CModel::WriteMinorOutput: Unable to open output file "+tmpFilename+" for writing.").c_str(),Options->noisy);
     }
-    BAS<<"ID,Qref[m3/s],reach_length[m],area[km2],drainage_area[km2],t_conc[d],t_peak[d],gamma_sh,gamma_sc[1/d],celerity[m/s],diffusivity[m2/s],N,UH[0],UH[1],UH[2],..."<<endl;
+    BAS<<"ID,Qref[m3/s],reach_length[m],area[km2],drainage_area[km2],t_conc[d],t_peak[d],gamma_sh,gamma_sc[1/d],celerity[m/s],diffusivity[m2/s],has observed flow,N,UH[0],UH[1],UH[2],..."<<endl;
     for(int pp=0;pp<_nSubBasins;pp++) {
+      has_obs=false;
       BAS<<_pSubBasins[pp]->GetID()<<",  "<<_pSubBasins[pp]->GetReferenceFlow();
       BAS<<","<<_pSubBasins[pp]->GetReachLength();
       BAS<<","<<_pSubBasins[pp]->GetBasinArea();
@@ -1415,6 +1449,13 @@ void CModel::WriteMajorOutput(const time_struct &tt, string solfile, bool final)
       BAS<<","<<_pSubBasins[pp]->GetBasinProperties("GAMMA_SCALE");
       BAS<<","<<_pSubBasins[pp]->GetBasinProperties("CELERITY");
       BAS<<","<<_pSubBasins[pp]->GetBasinProperties("DIFFUSIVITY");
+      //Has flow observations
+      for (i = 0; i < _nObservedTS; i++){
+        if (IsContinuousFlowObs(_pObservedTS[i],_pSubBasins[pp]->GetID())) {has_obs=true;}
+      }
+      if (has_obs){BAS<<", TRUE";}
+      else        {BAS<<",FALSE";}
+
       BAS<<","<<_pSubBasins[pp]->GetLatHistorySize();
       for (int i = 0; i < _pSubBasins[pp]->GetLatHistorySize(); i++) {
         BAS<<","<<_pSubBasins[pp]->GetUnitHydrograph()[i];
@@ -1722,7 +1763,8 @@ double CModel::CalculateAggDiagnostic(const int ii, const int j, const double &s
       if ((pBasin!=NULL) && (kk!=DOESNT_EXIST) && (!IsInSubBasinGroup(pBasin->GetID(),_pSBGroups[kk]->GetName()))){skip=true;}
     }
     else{ //HRU-linked
-      if ((kk!=DOESNT_EXIST) && (!IsInHRUGroup(_pObservedTS[i]->GetLocID(),_pHRUGroups[kk]->GetName()))){skip=true;}
+      int global_k=GetHRUByID(_pObservedTS[i]->GetLocID())->GetGlobalIndex();
+      if ((kk!=DOESNT_EXIST) && (!IsInHRUGroup(global_k,_pHRUGroups[kk]->GetName()))){skip=true;}
     }
 
     if (!skip)
@@ -1761,7 +1803,7 @@ void CModel::WriteEnsimStandardHeaders(const optStruct &Options)
 
   //WatershedStorage.tb0
   //--------------------------------------------------------------
-  int iAtmPrecip = GetStateVarIndex(ATMOS_PRECIP);
+  int iCumPrecip = GetStateVarIndex(ATMOS_PRECIP);
   string tmpFilename;
 
   if (Options.write_watershed_storage)
@@ -1800,7 +1842,7 @@ void CModel::WriteEnsimStandardHeaders(const optStruct &Options)
     _STORAGE<<":ColumnMetaData"<<endl;
     _STORAGE<<"  :ColumnName rainfall snowfall \"Channel storage\" \"Rivulet storage\"";
     for (i=0;i<GetNumStateVars();i++){
-      if ((CStateVariable::IsWaterStorage(_aStateVarType[i])) && (i!=iAtmPrecip)){
+      if ((CStateVariable::IsWaterStorage(_aStateVarType[i])) && (i!=iCumPrecip)){
   	_STORAGE<<" \""<<CStateVariable::GetStateVarLongName(_aStateVarType[i],
                                                          _aStateVarLayer[i],
                                                          _pTransModel)<<"\"";}}
@@ -1808,17 +1850,17 @@ void CModel::WriteEnsimStandardHeaders(const optStruct &Options)
 
     _STORAGE<<"  :ColumnUnits mm/d mm/d mm mm ";
     for (i=0;i<GetNumStateVars();i++){
-    if ((CStateVariable::IsWaterStorage(_aStateVarType[i])) && (i!=iAtmPrecip)){_STORAGE<<" mm";}}
+    if ((CStateVariable::IsWaterStorage(_aStateVarType[i])) && (i!=iCumPrecip)){_STORAGE<<" mm";}}
     _STORAGE<<" mm mm mm mm"<<endl;
 
     _STORAGE<<"  :ColumnType float float float float";
     for (i=0;i<GetNumStateVars();i++){
-      if ((CStateVariable::IsWaterStorage(_aStateVarType[i])) && (i!=iAtmPrecip)){_STORAGE<<" float";}}
+      if ((CStateVariable::IsWaterStorage(_aStateVarType[i])) && (i!=iCumPrecip)){_STORAGE<<" float";}}
     _STORAGE<<" float float float float"<<endl;
 
     _STORAGE << "  :ColumnFormat -1 -1 0 0";
     for (i = 0; i < GetNumStateVars(); i++){
-      if ((CStateVariable::IsWaterStorage(_aStateVarType[i])) && (i != iAtmPrecip)){
+      if ((CStateVariable::IsWaterStorage(_aStateVarType[i])) && (i != iCumPrecip)){
 	    _STORAGE << " 0";
       }
     }
@@ -1902,7 +1944,8 @@ void CModel::WriteNetcdfStandardHeaders(const optStruct &Options)
   int         dimids1[ndims1];                       // array which will contain all dimension ids for a variable
   int         ncid, varid_pre;                       // When we create netCDF variables and dimensions, we get back an ID for each one.
   int         time_dimid, varid_time;                // dimension ID (holds number of time steps) and variable ID (holds time values) for time
-  int         nSim, nbasins_dimid, varid_bsim;       // # of sub-basins with simulated outflow, dimension ID, and
+  int         nSim, nbasins_dimid, varid_bsim,varid_bsim2;       
+  //                                                 // # of sub-basins with simulated outflow, dimension ID, and
   //                                                 // variable to write basin IDs for simulated outflows
   int         varid_qsim;                            // variable ID for simulated outflows
   int         varid_qobs;                            // variable ID for observed outflows
@@ -1977,12 +2020,22 @@ void CModel::WriteNetcdfStandardHeaders(const optStruct &Options)
     // (c) create variable  and set attributes for"basin_name"
     dimids1[0] = nbasins_dimid;
     retval = nc_def_var(_HYDRO_ncid, "basin_name", NC_STRING, ndims1, dimids1, &varid_bsim);       HandleNetCDFErrors(retval);
-    tmp ="Name/ID of sub-basins with simulated outflows";
+    tmp ="ID of sub-basins with simulated outflows";
     tmp2="timeseries_id";
     tmp3="1";
     retval = nc_put_att_text(_HYDRO_ncid, varid_bsim, "long_name",  tmp.length(), tmp.c_str());    HandleNetCDFErrors(retval);
     retval = nc_put_att_text(_HYDRO_ncid, varid_bsim, "cf_role"  , tmp2.length(),tmp2.c_str());    HandleNetCDFErrors(retval);
     retval = nc_put_att_text(_HYDRO_ncid, varid_bsim, "units"    , tmp3.length(),tmp3.c_str());    HandleNetCDFErrors(retval);
+    
+    // (d) create variable  and set attributes for"basin_fullname"
+    dimids1[0] = nbasins_dimid;
+    retval = nc_def_var(_HYDRO_ncid, "basin_fullname", NC_STRING, ndims1, dimids1, &varid_bsim2);       HandleNetCDFErrors(retval);
+    tmp ="Name of sub-basins with simulated outflows";
+    tmp2="timeseries_id";
+    tmp3="1";
+    retval = nc_put_att_text(_HYDRO_ncid, varid_bsim2, "long_name",  tmp.length(), tmp.c_str());    HandleNetCDFErrors(retval);
+    retval = nc_put_att_text(_HYDRO_ncid, varid_bsim2, "cf_role"  , tmp2.length(),tmp2.c_str());    HandleNetCDFErrors(retval);
+    retval = nc_put_att_text(_HYDRO_ncid, varid_bsim2, "units"    , tmp3.length(),tmp3.c_str());    HandleNetCDFErrors(retval);
 
     varid_qsim= NetCDFAddMetadata2D(_HYDRO_ncid, time_dimid,nbasins_dimid,"q_sim","Simulated outflows","m**3 s**-1");
     varid_qobs= NetCDFAddMetadata2D(_HYDRO_ncid, time_dimid,nbasins_dimid,"q_obs","Observed outflows" ,"m**3 s**-1");
@@ -2000,7 +2053,7 @@ void CModel::WriteNetcdfStandardHeaders(const optStruct &Options)
 
   // (a) write gauged basin names/IDs to variable "basin_name"
   if (nSim>0){
-    WriteNetCDFBasinList(_HYDRO_ncid,varid_bsim,this,false,Options);
+    WriteNetCDFBasinList(_HYDRO_ncid,varid_bsim,varid_bsim2,this,false,Options);
   }
 
   //====================================================================
@@ -2051,12 +2104,23 @@ void CModel::WriteNetcdfStandardHeaders(const optStruct &Options)
       // (c) create variable  and set attributes for"basin_name"
       dimids1[0] = nbasins_dimid;
       retval = nc_def_var(_RESSTAGE_ncid,"basin_name",NC_STRING,ndims1,dimids1,&varid_bsim);         HandleNetCDFErrors(retval);
-      tmp ="Name/ID of sub-basins with simulated outflows";
+      tmp ="subbasin ID of reservoirs with simulated stage";
       tmp2="timeseries_id";
       tmp3="1";
       retval = nc_put_att_text(_RESSTAGE_ncid,varid_bsim,"long_name", tmp.length(), tmp.c_str());    HandleNetCDFErrors(retval);
       retval = nc_put_att_text(_RESSTAGE_ncid,varid_bsim,"cf_role",  tmp2.length(),tmp2.c_str());    HandleNetCDFErrors(retval);
       retval = nc_put_att_text(_RESSTAGE_ncid,varid_bsim,"units",    tmp3.length(),tmp3.c_str());    HandleNetCDFErrors(retval);
+
+      // (d) create variable  and set attributes for"basin_fullname"
+      dimids1[0] = nbasins_dimid;
+      retval = nc_def_var(_RESSTAGE_ncid, "basin_fullname", NC_STRING, ndims1, dimids1, &varid_bsim2);       HandleNetCDFErrors(retval);
+      tmp ="subbasin name of reservoirs with simulated stage";
+      tmp2="timeseries_id";
+      tmp3="1";
+      retval = nc_put_att_text(_RESSTAGE_ncid, varid_bsim2, "long_name",  tmp.length(), tmp.c_str());    HandleNetCDFErrors(retval);
+      retval = nc_put_att_text(_RESSTAGE_ncid, varid_bsim2, "cf_role"  , tmp2.length(),tmp2.c_str());    HandleNetCDFErrors(retval);
+      retval = nc_put_att_text(_RESSTAGE_ncid, varid_bsim2, "units"    , tmp3.length(),tmp3.c_str());    HandleNetCDFErrors(retval);
+
 
       varid_qsim= NetCDFAddMetadata2D(_RESSTAGE_ncid,time_dimid,nbasins_dimid,"h_sim","Simulated stage","m");
       varid_qobs= NetCDFAddMetadata2D(_RESSTAGE_ncid,time_dimid,nbasins_dimid,"h_obs","Observed stage","m");
@@ -2069,7 +2133,7 @@ void CModel::WriteNetcdfStandardHeaders(const optStruct &Options)
     // write values to NetCDF
     // (a) write gauged reservoir basin names/IDs to variable "basin_name"
     if (nSim>0){
-      WriteNetCDFBasinList(_RESSTAGE_ncid,varid_bsim,this,true,Options);
+      WriteNetCDFBasinList(_RESSTAGE_ncid,varid_bsim,varid_bsim2,this,true,Options);
     }
   }
 
@@ -2109,9 +2173,9 @@ void CModel::WriteNetcdfStandardHeaders(const optStruct &Options)
     varid= NetCDFAddMetadata(_STORAGE_ncid, time_dimid,"reservoir_storage","Reservoir Storage","mm");
     varid= NetCDFAddMetadata(_STORAGE_ncid, time_dimid,"rivulet_storage","Rivulet Storage","mm");
 
-    int iAtmPrecip=GetStateVarIndex(ATMOS_PRECIP);
+    int iCumPrecip=GetStateVarIndex(ATMOS_PRECIP);
     for(int i=0;i<_nStateVars;i++){
-      if((CStateVariable::IsWaterStorage(_aStateVarType[i])) && (i!=iAtmPrecip)){
+      if((CStateVariable::IsWaterStorage(_aStateVarType[i])) && (i!=iCumPrecip)){
 	      string name = GetStateVarInfo()->GetStateVarLongName(_aStateVarType[i],
                                                               _aStateVarLayer[i],
                                                               GetTransportModel());
@@ -2213,12 +2277,22 @@ void CModel::WriteNetcdfStandardHeaders(const optStruct &Options)
       // (c) create variable  and set attributes for"basin_name"
       dimids1[0] = nbasins_dimid;
       retval = nc_def_var(_RESMB_ncid,"basin_name",NC_STRING,ndims1,dimids1,&varid_bsim);         HandleNetCDFErrors(retval);
-      tmp ="Name/ID of sub-basins with simulated outflows";
+      tmp ="subbasin ID of reservoirs with simulated stage";
       tmp2="timeseries_id";
       tmp3="1";
       retval = nc_put_att_text(_RESMB_ncid,varid_bsim,"long_name", tmp.length(), tmp.c_str());    HandleNetCDFErrors(retval);
       retval = nc_put_att_text(_RESMB_ncid,varid_bsim,"cf_role",  tmp2.length(),tmp2.c_str());    HandleNetCDFErrors(retval);
       retval = nc_put_att_text(_RESMB_ncid,varid_bsim,"units",    tmp3.length(),tmp3.c_str());    HandleNetCDFErrors(retval);
+
+      // (d) create variable  and set attributes for"basin_fullname"
+      dimids1[0] = nbasins_dimid;
+      retval = nc_def_var(_RESMB_ncid, "basin_fullname", NC_STRING, ndims1, dimids1, &varid_bsim2);       HandleNetCDFErrors(retval);
+      tmp ="subbasin name of reservoirs with simulated stage";
+      tmp2="timeseries_id";
+      tmp3="1";
+      retval = nc_put_att_text(_RESMB_ncid, varid_bsim2, "long_name",  tmp.length(), tmp.c_str());    HandleNetCDFErrors(retval);
+      retval = nc_put_att_text(_RESMB_ncid, varid_bsim2, "cf_role"  , tmp2.length(),tmp2.c_str());    HandleNetCDFErrors(retval);
+      retval = nc_put_att_text(_RESMB_ncid, varid_bsim2, "units"    , tmp3.length(),tmp3.c_str());    HandleNetCDFErrors(retval);
 
       varid= NetCDFAddMetadata2D(_RESMB_ncid,time_dimid,nbasins_dimid,"stage",    "stage",  "m");
       varid= NetCDFAddMetadata2D(_RESMB_ncid,time_dimid,nbasins_dimid,"area",     "area",  "m2");
@@ -2242,7 +2316,7 @@ void CModel::WriteNetcdfStandardHeaders(const optStruct &Options)
     // write values to NetCDF
     // (a) write gauged reservoir basin names/IDs to variable "basin_name"
     if (nSim>0){
-      WriteNetCDFBasinList(_RESMB_ncid,varid_bsim,this,true,Options);
+      WriteNetCDFBasinList(_RESMB_ncid,varid_bsim,varid_bsim2,this,true,Options);
     }
   }
 #endif   // end compilation if NetCDF library is available
@@ -2588,10 +2662,10 @@ void  CModel::WriteNetcdfMinorOutput ( const optStruct   &Options,
 
     double currentWater=0.0;
     double S;string short_name;
-    int iAtmPrecip=GetStateVarIndex(ATMOS_PRECIP);
+    int iCumPrecip=GetStateVarIndex(ATMOS_PRECIP);
     for (int i=0;i<GetNumStateVars();i++)
     {
-      if ((CStateVariable::IsWaterStorage(_aStateVarType[i])) && (i!=iAtmPrecip))
+      if ((CStateVariable::IsWaterStorage(_aStateVarType[i])) && (i!=iCumPrecip))
 	  {
 	    S=FormatDouble(GetAvgStateVar(i));
 	    short_name = GetStateVarInfo()->GetStateVarLongName(_aStateVarType[i],
@@ -2978,27 +3052,30 @@ void AddSingleValueToNetCDF(const int out_ncid,const string &shortname,const siz
 /// \brief writes list of Basin IDs to NetCDF file
 /// used for hydrographs.nc, reservoirstages.nc, pollutographs.nc
 /// \param ncid [in] NetCDF file identifier
-/// \param varid [in] ID of existing basin attribute
+/// \param varid [in] netCDF ID of existing basin ID attribute
+/// \param varid_name [in] netCDF ID of existing basin name attribute
 /// \param is_res [in] true if this is a reservoir file and only reservoir basins should be included
 //
-void WriteNetCDFBasinList(const int ncid,const int varid,const CModel* pModel,bool is_res,const optStruct& Options)
+void WriteNetCDFBasinList(const int ncid,const int varid,const int varid_name,const CModel* pModel,bool is_res,const optStruct& Options)
 {
 #ifdef _RVNETCDF_
   int ibasin = 0;
   int retval;
   size_t      start[1],count[1];                    // determines where and how much will be written to NetCDF
-  char* current_basin_name[1];                       // current name of basin
+  char* current_basin_name[1];                      // current name or ID  of basin
   current_basin_name[0]=new char[200];
   for(int p=0;p<pModel->GetNumSubBasins();p++) {
     if(pModel->GetSubBasin(p)->IsGauged()  && (pModel->GetSubBasin(p)->IsEnabled())) {
       if (!( (is_res) && (pModel->GetSubBasin(p)->GetReservoir()==NULL))){
-        string bname;
-        if((pModel->GetSubBasin(p)->GetName()=="") || (Options.deltaresFEWS)) { bname = to_string(pModel->GetSubBasin(p)->GetID()); }
-        else                                                                  { bname = pModel->GetSubBasin(p)->GetName(); }
+        string bID,bname;
+        bID   = to_string(pModel->GetSubBasin(p)->GetID()); 
+        bname = pModel->GetSubBasin(p)->GetName(); 
         start[0] = ibasin;
         count[0] = 1;
-        strcpy(current_basin_name[0],bname.c_str());
+        strcpy(current_basin_name[0],bID.c_str());
         retval = nc_put_vara_string(ncid,varid,start,count,(const char**)current_basin_name);  HandleNetCDFErrors(retval);
+        strcpy(current_basin_name[0],bname.c_str());
+        retval = nc_put_vara_string(ncid,varid_name,start,count,(const char**)current_basin_name);  HandleNetCDFErrors(retval);
         ibasin++;
       }
     }
@@ -3016,7 +3093,7 @@ void WriteNetCDFBasinList(const int ncid,const int varid,const CModel* pModel,bo
 /// \param &calib_SBID [in] target subbasin ID
 /// \param &calib_Obj [in] calibration objective diagnostics (e.g., NSE)
 //
-double CModel::GetObjFuncVal(long calib_SBID,diag_type calib_Obj, const string calib_period) const
+double CModel::GetObjFuncVal(long long calib_SBID,diag_type calib_Obj, const string calib_period) const
 {
   double starttime=0.0;
   double endtime  =0.0;

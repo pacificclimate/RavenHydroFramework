@@ -44,3 +44,6 @@ Raven_errors.txt
 
 # Directories
 test/
+
+# JetBrains
+.idea

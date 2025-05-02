@@ -1,3 +1,11 @@
+/*----------------------------------------------------------------
+  Raven Library Source Code
+  Copyright (c) 2008-2025 the Raven Development Team
+  ----------------------------------------------------------------
+  enum termtype
+  expressionTerm struct
+  expressionStruct structure
+  ----------------------------------------------------------------*/
 #include "RavenInclude.h"
 #include "TimeSeries.h"
 #include "LookupTable.h"
@@ -11,15 +19,17 @@ enum termtype
   TERM_DV,        //< decision variable !Q123 or named
   TERM_TS,        //< time series @ts(name,n)
   TERM_LT,        //< lookup table @lookup(x)
+  TERM_DLT,       //< lookup table derivative @dlookup(x)
   TERM_HRU,       //< state variable @HRU_var(SNOW,2345)
   TERM_SB,        //< state variable @SB_var(SNOW,234)
   TERM_CONST,     //< constant
-  TERM_CONTROL,   //< control variable (constant updated each time step)
+  TERM_WORKFLOW,  //< workflow variable (constant updated each time step)
   TERM_HISTORY,   //< bracketed - !Q123[-2]
+  TERM_ITER,      //< decision variable guess ?Q123 or ?Q.RalphRiver
   TERM_MAX,       //< @max(x,y)
   TERM_MIN,       //< @min(x,y)
-  TERM_CONVERT,   //< @convert(x,units)
   TERM_CUMUL_TS,  //< @cumul(ts_name,duration) //MAY WANT @cumul(ts_name,duration,n) to handle time shift, e.g., 3 days to 10 days ago?
+  TERM_POW,       //< @pow(x,n)
   TERM_CUMUL,     //< cumulative delivery !C123
   TERM_UNKNOWN    //< unknown
 };
@@ -31,7 +41,7 @@ enum termtype
 //   -decision_var
 //   -exp_condition (may be defined using expressionStruct)
 //   -op_regime (has conditions)
-//   -control_var (defined using expressionStruct)
+//   -workflowVar (defined using expressionStruct)
 //   -managementGoal (built using multiple operating regimes)
 // -------------------------------------------------------------------
 
@@ -75,6 +85,8 @@ struct expressionStruct //full expression
   int                nGroups;     //< total number of terms groups in expression
   int               *nTermsPerGrp;//< number of terms per group [size: nGroups]
   comparison         compare;     //< comparison operator (==, <, >)
+
+  bool               has_nonlin;
 
   string             origexp;     //< original string expression
 
