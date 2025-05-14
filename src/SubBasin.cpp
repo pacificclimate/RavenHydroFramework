@@ -1186,7 +1186,7 @@ double CSubBasin::GetBasinProperties(const string label) const
 
   else if (!label_n.compare("RESERVOIR_CREST_WIDTH")) {
     if (_pReservoir != NULL) {return _pReservoir->GetCrestWidth(); }
-    else                    {return 0.0;}
+    else                     {return 0.0;}
   }
   
   else if (!label_n.compare("RIVERBED_CONDUCTIVITY")){ return _bed_conductivity; }
@@ -1201,7 +1201,7 @@ double CSubBasin::GetBasinProperties(const string label) const
     else                     {return 1.0;}
   }
   else if (!label_n.compare("LAKE_CONVECT_COEFF")) {
-    if (_pReservoir != NULL) {_pReservoir->GetLakeConvectionCoeff();}
+    if (_pReservoir != NULL) {return _pReservoir->GetLakeConvectionCoeff();}
     else                     {return 0.0;}
   }
 
