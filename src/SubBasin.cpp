@@ -1200,6 +1200,22 @@ double CSubBasin::GetBasinProperties(const string label) const
     }
     else{return 0.0;}
   }
+  
+  else if (!label_n.compare("RIVERBED_CONDUCTIVITY")){ return _bed_conductivity; }
+  else if (!label_n.compare("RIVERBED_THICKNESS"   )){ return _bed_thickness; }
+  else if (!label_n.compare("LAKEBED_CONDUCTIVITY")) {
+    if (_pReservoir != NULL) {return _pReservoir->GetLakebedConductivity(); }
+    else                     {return 0.0;}
+  }
+  else if (!label_n.compare("LAKEBED_THICKNESS")) {
+    if (_pReservoir != NULL) {return _pReservoir->GetLakebedThickness(); }
+    else                     {return 1.0;}
+  }
+  else if (!label_n.compare("LAKE_CONVECT_COEFF")) {
+    if (_pReservoir != NULL) {return _pReservoir->GetLakeConvectionCoeff();}
+    else                     {return 0.0;}
+  }
+  
   else{
     return INDEX_NOT_FOUND;//bad string
   }
