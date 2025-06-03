@@ -1,6 +1,6 @@
 /*----------------------------------------------------------------
   Raven Library Source Code
-  Copyright (c) 2008-2022 the Raven Development Team
+  Copyright (c) 2008-2025 the Raven Development Team
   ----------------------------------------------------------------*/
 #include "RavenInclude.h"
 #include "Properties.h"
@@ -226,7 +226,7 @@ bool ParseClassPropertiesFile(CModel         *&pModel,
     }
   }
 
-  if (Options.create_rvp_template){
+  if (Options.create_rvp_template){ //can proceed even if .rvp doesnt exist.
     CreateRVPTemplate(aPmaster,aPCmaster,nPmaster,Options);
     ExitGracefully("Template RVP File Created.",SIMULATION_DONE);
   }
@@ -473,9 +473,10 @@ bool ParseClassPropertiesFile(CModel         *&pModel,
                            (!string(s[0]).compare("GLACIER")) ||
                            (!string(s[0]).compare("PAVEMENT")) ||
                            (!string(s[0]).compare("WATER")) ||
+                           (!string(s[0]).compare("WETLAND")) ||
                            (!string(s[0]).compare("ROCK")));
           ExitGracefullyIf((nhoriz==0) && (!is_special),
-                           "ParseClassPropertiesFile:  only special soil profiles (LAKE,WATER,GLACIER,PAVEMENT, or ROCK) can have zero horizons",BAD_DATA);
+                           "ParseClassPropertiesFile:  only special soil profiles (LAKE,WATER,GLACIER,PAVEMENT,WETLAND, or ROCK) can have zero horizons",BAD_DATA);
 
           for (int m=0;m<nhoriz;m++)
           {
@@ -538,6 +539,17 @@ bool ParseClassPropertiesFile(CModel         *&pModel,
         for (int j=0;j<nParamStrings-1;j++)
         {
           CSoilClass::SetSoilProperty(*parsed_soils[indices[i]],aParamStrings[j+1],properties[i][j]);
+        }
+      }
+      bool found_in_master;
+      for (int j=0;j<nParamStrings-1;j++){
+        found_in_master=false;
+        for (int k = 0; k < nPmaster; k++) {
+          if ((aPCmaster[k] == CLASS_SOIL) && (aPmaster[k]==aParamStrings[j+1])){found_in_master=true; break;}
+        }
+        if (!found_in_master) {
+          string warn="ParseClassPropertiesFile: Soil parameter "+aParamStrings[j+1]+" specified in .rvp file, but is not used within this model formulation.";
+          WriteAdvisory(warn.c_str(), Options.noisy);
         }
       }
       break;
@@ -624,6 +636,17 @@ bool ParseClassPropertiesFile(CModel         *&pModel,
           CLandUseClass::SetSurfaceProperty(parsed_surf[indices[i]],
                                             aParamStrings[j+1],
                                             properties[i][j]);
+        }
+      }
+      bool found_in_master;
+      for (int j=0;j<nParamStrings-1;j++){
+        found_in_master=false;
+        for (int k = 0; k < nPmaster; k++) {
+          if ((aPCmaster[k] == CLASS_LANDUSE) && (aPmaster[k]==aParamStrings[j+1])){found_in_master=true; break;}
+        }
+        if (!found_in_master) {
+          string warn="ParseClassPropertiesFile: Land Use parameter "+aParamStrings[j+1]+" specified in .rvp file, but is not used within this model formulation.";
+          WriteAdvisory(warn.c_str(), Options.noisy);
         }
       }
       break;
@@ -759,6 +782,17 @@ bool ParseClassPropertiesFile(CModel         *&pModel,
           CVegetationClass::SetVegetationProperty(parsed_veg   [indices[i]],
                                                   aParamStrings[j+1],
                                                   properties   [i][j]);
+        }
+      }
+      bool found_in_master;
+      for (int j=0;j<nParamStrings-1;j++){
+        found_in_master=false;
+        for (int k = 0; k < nPmaster; k++) {
+          if ((aPCmaster[k] == CLASS_VEGETATION) && (aPmaster[k]==aParamStrings[j+1])){found_in_master=true; break;}
+        }
+        if (!found_in_master) {
+          string warn="ParseClassPropertiesFile: Vegetation parameter "+aParamStrings[j+1]+" specified in .rvp file, but is not used within this model formulation.";
+          WriteAdvisory(warn.c_str(), Options.noisy);
         }
       }
       break;
@@ -1485,13 +1519,13 @@ bool ParseClassPropertiesFile(CModel         *&pModel,
 
   if (!Options.silent){cout<<"Autocalculating Model Parameters..."<<endl;}
 
-  pModel->GetGlobalParams()->AutoCalculateGlobalParams          (parsed_globals,global_template);
+  pModel->GetGlobalParams()->AutoCalculateGlobalParams(parsed_globals,global_template);
 
   for (int c=1;c<num_parsed_veg;c++){
-    pVegClasses [c-1]->AutoCalculateVegetationProps (parsed_veg[c],parsed_veg[0]);
+    pVegClasses [c-1]->AutoCalculateVegetationProps  (parsed_veg[c],parsed_veg[0]);
   }
   for (int c=1;c<num_parsed_soils;c++){
-    pSoilClasses[c]->AutoCalculateSoilProps       (*parsed_soils[c],*parsed_soils[0],pModel->GetTransportModel()->GetNumConstituents());
+    pSoilClasses[c]->AutoCalculateSoilProps          (*parsed_soils[c],*parsed_soils[0],pModel->GetTransportModel()->GetNumConstituents());
   }
   for (int c=1;c<num_parsed_lult;c++) {
     pModel->GetLanduseClass(c-1)->AutoCalculateLandUseProps(parsed_surf[c], parsed_surf[0]);
@@ -1553,6 +1587,7 @@ bool ParseClassPropertiesFile(CModel         *&pModel,
 
   delete [] indices;
   for (int i=0;i<MAX_NUM_IN_CLASS;i++){delete [] properties[i];}delete [] properties;
+  delete p;
 
   return true;
 }
@@ -1708,7 +1743,7 @@ void  AddToMasterParamList   (string        *&aPm, class_type       *&aPCm, int 
     aPCm_new[nPm+i]=aPC[i];
   }
   if (aPm!=NULL){delete [] aPm; aPm=NULL;}
-  if (aPm!=NULL){delete [] aPCm;aPCm=NULL;}
+  if (aPCm!=NULL){delete [] aPCm;aPCm=NULL;}
   aPm =aPm_new;
   aPCm=aPCm_new;
   nPm=nPm+nP;
@@ -1858,6 +1893,10 @@ void  CreateRVPTemplate(string *aP,class_type *aPC,int &nP,const optStruct &Opti
   for (int ii=0;ii<nP;ii++)
   {
     repeat=false;for(int iii=0;iii<ii;iii++){ if(aP[ii]==aP[iii]){ repeat=true; } }
+    if (aP[ii]=="TOC_MULTIPLIER"         ) { repeat = true; }/*dont include these in .rvp*/
+    if (aP[ii]=="GAMMA_SHAPE_MULTIPLIER" ) { repeat = true; }
+    if (aP[ii]=="GAMMA_SCALE_MULTIPLIER" ) { repeat = true; }
+    if (aP[ii]=="TIME_TO_PEAK_MULTIPLIER") { repeat = true; }
     if ((aPC[ii]==CLASS_GLOBAL) && (!repeat)){
       TEMPLATE<<":GlobalParameter "<<std::setw (sp+5) <<aP[ii]<<std::setw (1) <<" ** "<<endl;
     }
@@ -1987,7 +2026,8 @@ void  CreateRVPTemplate(string *aP,class_type *aPC,int &nP,const optStruct &Opti
     for(int ii=0;ii<nP;ii++)
     {
       repeat=false;for(int iii=0;iii<ii;iii++){ if(aP[ii]==aP[iii]){ repeat=true; } }
-      if((aPC[ii]==CLASS_VEGETATION) && (!repeat) && (aP[ii]!="MAX_LAI")&& (aP[ii]!="RELATIVE_LAI")&& (aP[ii]!="RELATIVE_HT")){
+      if ((aP[ii]=="MAX_LAI") || (aP[ii]=="RELATIVE_LAI")||  (aP[ii]=="RELATIVE_HT")){repeat=true;}
+      if ((aPC[ii]==CLASS_VEGETATION) && (!repeat)){
         TEMPLATE<<std::setw(sp) <<aP[ii]<<std::setw(1)<<", ";
       }
     }
@@ -1996,7 +2036,8 @@ void  CreateRVPTemplate(string *aP,class_type *aPC,int &nP,const optStruct &Opti
     for(int ii=0;ii<nP;ii++)
     {
       repeat=false;for(int iii=0;iii<ii;iii++){ if(aP[ii]==aP[iii]){ repeat=true; } }
-      if((aPC[ii]==CLASS_VEGETATION) && (!repeat) && (aP[ii]!="MAX_LAI") && (aP[ii]!="RELATIVE_LAI")&& (aP[ii]!="RELATIVE_HT")){
+      if ((aP[ii]=="MAX_LAI") || (aP[ii]=="RELATIVE_LAI")||  (aP[ii]=="RELATIVE_HT")){repeat=true;}
+      if ((aPC[ii]==CLASS_VEGETATION) && (!repeat)){
         TEMPLATE<<std::setw(sp) <<"-"<<std::setw(1)<<", ";
       }
     }
@@ -2005,7 +2046,8 @@ void  CreateRVPTemplate(string *aP,class_type *aPC,int &nP,const optStruct &Opti
     for(int ii=0;ii<nP;ii++)
     {
       repeat=false;for(int iii=0;iii<ii;iii++){ if(aP[ii]==aP[iii]){ repeat=true; } }
-      if((aPC[ii]==CLASS_VEGETATION) && (!repeat) && (aP[ii]!="MAX_LAI") && (aP[ii]!="RELATIVE_LAI")&& (aP[ii]!="RELATIVE_HT")){
+      if ((aP[ii]=="MAX_LAI") || (aP[ii]=="RELATIVE_LAI")||  (aP[ii]=="RELATIVE_HT")){repeat=true;}
+      if ((aPC[ii]==CLASS_VEGETATION) && (!repeat)){
         TEMPLATE<<std::setw(sp) <<"**"<<std::setw(1)<<", ";
       }
     }
@@ -2014,7 +2056,8 @@ void  CreateRVPTemplate(string *aP,class_type *aPC,int &nP,const optStruct &Opti
     for(int ii=0;ii<nP;ii++)
     {
       repeat=false;for(int iii=0;iii<ii;iii++){ if(aP[ii]==aP[iii]){ repeat=true; } }
-      if((aPC[ii]==CLASS_VEGETATION) && (!repeat) && (aP[ii]!="MAX_LAI") && (aP[ii]!="RELATIVE_LAI")&& (aP[ii]!="RELATIVE_HT")){
+      if ((aP[ii]=="MAX_LAI") || (aP[ii]=="RELATIVE_LAI")||  (aP[ii]=="RELATIVE_HT")){repeat=true;}
+      if ((aPC[ii]==CLASS_VEGETATION) && (!repeat)){
         TEMPLATE<<std::setw(sp) <<"**"<<std::setw(1)<<", ";
       }
     }
@@ -2023,7 +2066,8 @@ void  CreateRVPTemplate(string *aP,class_type *aPC,int &nP,const optStruct &Opti
     for(int ii=0;ii<nP;ii++)
     {
       repeat=false;for(int iii=0;iii<ii;iii++){ if(aP[ii]==aP[iii]){ repeat=true; } }
-      if((aPC[ii]==CLASS_VEGETATION) && (!repeat) && (aP[ii]!="MAX_LAI") && (aP[ii]!="RELATIVE_LAI")&& (aP[ii]!="RELATIVE_HT")){
+      if ((aP[ii]=="MAX_LAI") || (aP[ii]=="RELATIVE_LAI")||  (aP[ii]=="RELATIVE_HT")){repeat=true;}
+      if ((aPC[ii]==CLASS_VEGETATION) && (!repeat)){
         TEMPLATE<<std::setw(sp) <<"**"<<std::setw(1)<<", ";
       }
     }
@@ -2034,18 +2078,18 @@ void  CreateRVPTemplate(string *aP,class_type *aPC,int &nP,const optStruct &Opti
     for(int ii=0;ii<nP;ii++)
     {
       if((aPC[ii]==CLASS_VEGETATION) && (aP[ii]!="RELATIVE_LAI")){
-        TEMPLATE<<":SeasonalRelativeLAI"<<endl;
+        TEMPLATE<<":SeasonalCanopyLAI"<<endl;
         TEMPLATE<<"  *VEGET_1*, *J*,*F*,*M*,*A*,*M*,*J*,*J*,*A*,*S*,*O*,*N*,*D*"<<endl;
-        TEMPLATE<<":EndSeasonalRelativeLAI"<<endl;
+        TEMPLATE<<":EndSeasonalCanopyLAI"<<endl;
         break;
       }
     }
     for(int ii=0;ii<nP;ii++)
     {
       if((aPC[ii]==CLASS_VEGETATION) && (aP[ii]!="RELATIVE_HT")){
-        TEMPLATE<<":SeasonalRelativeHeight"<<endl;
+        TEMPLATE<<":SeasonalCanopyHeight"<<endl;
         TEMPLATE<<"  *VEGET_1*, *J*,*F*,*M*,*A*,*M*,*J*,*J*,*A*,*S*,*O*,*N*,*D*"<<endl;
-        TEMPLATE<<":EndSeasonalRelativeHeight"<<endl;
+        TEMPLATE<<":EndSeasonalCanopyHeight"<<endl;
         break;
       }
     }

@@ -481,7 +481,6 @@ void  CLandUseClass::SetSurfaceProperty(surface_struct &S,
   else if (!name.compare("DEP_MAX"                )){S.dep_max =value;}
   else if (!name.compare("DEP_MAX_FLOW"           )){S.dep_max_flow =value;}
   else if (!name.compare("DEP_N"                  )){S.dep_n =value;}
-  else if (!name.compare("DEP_THRESHHOLD"         )){S.dep_threshold =value;}/*old typo-backward compat*/
   else if (!name.compare("DEP_THRESHOLD"          )){S.dep_threshold =value;}
   else if (!name.compare("DEP_CRESTRATIO"         )){S.dep_crestratio =value;}
   else if (!name.compare("PDMROF_B"               )){S.PDMROF_b =value; }
@@ -508,6 +507,7 @@ void  CLandUseClass::SetSurfaceProperty(surface_struct &S,
   else if (!name.compare("PET_LIN_COEFF"          )){S.pet_lin_coeff=value;}
   else if (!name.compare("PET_VAP_COEFF"          )){S.pet_vap_coeff=value;}
   else if (!name.compare("RELHUM_CORR"            )){S.relhum_corr=value;}
+  else if (!name.compare("WINDVEL_CORR"           )){S.wind_vel_corr=value;}
   else if (!name.compare("WIND_VEL_CORR"          )){S.wind_vel_corr=value;}
   else if (!name.compare("GR4J_X4"                )){S.GR4J_x4=value;}
   else if (!name.compare("UBC_ICEPT_FACTOR"       )){S.UBC_icept_factor=value;}
@@ -587,7 +587,6 @@ double CLandUseClass::GetSurfaceProperty(const surface_struct &S, string param_n
   else if (!name.compare("DEP_MAX"                )){return S.dep_max ;}
   else if (!name.compare("DEP_MAX_FLOW"           )){return S.dep_max_flow;}
   else if (!name.compare("DEP_N"                  )){return S.dep_n;}
-  else if (!name.compare("DEP_THRESHHOLD"         )){return S.dep_threshold;}/*old typo*/
   else if (!name.compare("DEP_THRESHOLD"          )){return S.dep_threshold;}
   else if (!name.compare("DEP_K"                  )){return S.dep_k;}
   else if (!name.compare("DEP_SEEP_K"             )){return S.dep_seep_k;}
@@ -614,6 +613,7 @@ double CLandUseClass::GetSurfaceProperty(const surface_struct &S, string param_n
   else if (!name.compare("PET_LIN_COEFF"          )){return S.pet_lin_coeff;}
   else if (!name.compare("PET_VAP_COEFF"          )){return S.pet_vap_coeff;}
   else if (!name.compare("RELHUM_CORR"            )){return S.relhum_corr;}
+  else if (!name.compare("WINDVEL_CORR"           )){return S.wind_vel_corr;}
   else if (!name.compare("WIND_VEL_CORR"          )){return S.wind_vel_corr;}
   else if (!name.compare("GR4J_X4"                )){return S.GR4J_x4;}
   else if (!name.compare("UBC_ICEPT_FACTOR"       )){return S.UBC_icept_factor;}

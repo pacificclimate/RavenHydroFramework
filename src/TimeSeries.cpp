@@ -17,7 +17,7 @@ void GetNetCDFStationArray(const int ncid, const string filename,int &stat_dimid
 /// \brief Implementation of the time series constructor when time series is single constant value
 /// \param one_value [in] Constant value of time series
 //
-CTimeSeries::CTimeSeries(string Name, long loc_ID, double one_value)
+CTimeSeries::CTimeSeries(string Name, long long loc_ID, double one_value)
   :CTimeSeriesABC(TS_REGULAR,Name,loc_ID,"")
 {
   _start_day =0.0;
@@ -46,7 +46,7 @@ CTimeSeries::CTimeSeries(string Name, long loc_ID, double one_value)
 /// \param is_pulse_type [in] Flag determining time-series type (pulse-based vs. piecewise-linear)
 //
 CTimeSeries::CTimeSeries(string     Name,
-                         long       loc_ID,
+                         long long  loc_ID,
                          string     filename,
                          double     strt_day,
                          int        start_yr,
@@ -88,7 +88,7 @@ CTimeSeries::CTimeSeries(string     Name,
 /// \brief Implementation of the time series constructor for empty time series used to store model generated data
 ///
 CTimeSeries::CTimeSeries(string     Name,
-                         long       loc_ID,
+                         long long  loc_ID,
                          string     filename,
                          double     strt_day,
                          int        start_yr,
@@ -332,10 +332,15 @@ void CTimeSeries::InitializeResample(const int nSampVal, const double sampInterv
 ///
 /// \param &t_loc [in] Local time for time series (=0 for first time data present)
 /// \return Index of time period for time t_loc; if t_loc<0, returns 0, if t_loc>_nPulses-1, returns nPulses-1
+/// ?OR? \return Index of time period for local time t_loc; if t_loc<0 or >_nPulses-1, return DOESNT_EXIST//JRCNEWTS
+/// right now this has some unintended consequences for the final time step of solution when the input data is the same duration as the simulation. Needs to be looked into further.
 //
 int CTimeSeries::GetTimeIndex(const double &t_loc) const
 {
   return min((int)(max(floor(t_loc/_interval),0.0)),_nPulses-1);
+  //int index=(int)floor((t_loc+TIME_CORRECTION)/ _interval);//JRCNEWTS
+  //if (index >= _nPulses || index < 0) {index=DOESNT_EXIST;}//JRCNEWTS
+  //return index;//JRCNEWTS
 }
 //////////////////////////////////////////////////////////////////
 /// \brief Returns sample index nn of time period for time t_model in terms of model time
@@ -358,6 +363,8 @@ double CTimeSeries::GetValue(const double &t) const
   int n= 0;
   double t_loc = t + _t_corr; //local time series time
   n = GetTimeIndex(t_loc);
+
+  //if (n==DOESNT_EXIST){return RAV_BLANK_DATA;} //JRCNEWTS
 
   if (_pulse){return _aVal[n];}
   else      {
@@ -384,8 +391,10 @@ double CTimeSeries::GetAvgValue(const double &t, const double &tstep) const
   //t_loc+tstep is now between n2*_interval and (n2+1)*_interval
   double inc;
   double blank = 0;
+  //if ((n1==DOESNT_EXIST) || (n2==DOESNT_EXIST)){return RAV_BLANK_DATA;}//JRCNEWTS
   if (t_loc < -TIME_CORRECTION)   {return RAV_BLANK_DATA; }
   if (t_loc > _nPulses*_interval) {return RAV_BLANK_DATA; }
+  //if (t_loc +tstep/2.0 > _nPulses*_interval){return RAV_BLANK_DATA;}
   if (_pulse){
     if (n1 == n2){ return _aVal[n1]; }
     else{
@@ -424,8 +433,8 @@ double CTimeSeries::GetMinValue(const double &t, const double &tstep) const
   double vmin(ALMOST_INF);
   double t_loc=t+_t_corr;
   n1=GetTimeIndex(t_loc      +TIME_CORRECTION);//to account for potential roundoff error
-  n2=GetTimeIndex(t_loc+tstep-TIME_CORRECTION);
-
+  n2=GetTimeIndex(t_loc+tstep-TIME_CORRECTION);//JRCNEWTS
+  //if ((n1==DOESNT_EXIST) || (n2==DOESNT_EXIST)){return RAV_BLANK_DATA;}//JRCNEWTS
   ExitGracefullyIf(!_pulse,"CTimeSeries::GetMinValue (non-pulse)",STUB);
 
   if (n1==n2){return _aVal[n1];}
@@ -445,7 +454,8 @@ double CTimeSeries::GetMaxValue(const double &t, const double &tstep) const
   double vmax(-ALMOST_INF);
   double t_loc=t+_t_corr;
   n1=GetTimeIndex(t_loc      +TIME_CORRECTION);//to account for potential roundoff error
-  n2=GetTimeIndex(t_loc+tstep-TIME_CORRECTION);
+  n2=GetTimeIndex(t_loc+tstep-TIME_CORRECTION);//JRCNEWTS
+  //if ((n1==DOESNT_EXIST) || (n2==DOESNT_EXIST)){return RAV_BLANK_DATA;}//JRCNEWTS
 
   ExitGracefullyIf(!_pulse,"CTimeSeries::GetMaxValue (non-pulse)",STUB);
 
@@ -544,6 +554,7 @@ double CTimeSeries::GetDailyMax(const int model_day) const
 /// \notes only really valid for special ts storing model results for diagnostics.
 /// \param &t [in] Global time at which point value of time series is to be determined
 /// \param type [in] type of observed time series
+/// JRC: subtle difference between this and GetValue() - why do we need this??
 /// \return value of modelled time series
 //
 double CTimeSeries::GetModelledValue(const double &t,const ts_type type) const
@@ -551,7 +562,7 @@ double CTimeSeries::GetModelledValue(const double &t,const ts_type type) const
   int n=0;
   double t_loc=t+_t_corr;
   n=GetTimeIndex(t_loc);
-
+  //if (n==DOESNT_EXIST){return RAV_BLANK_DATA;}//JRCNEWTS
   if (type == TS_REGULAR){return GetAvgValue(t,_sampInterval);}
   else      {
     if (n==_nPulses-1){return _aVal[n];}
@@ -669,7 +680,7 @@ CTimeSeries  *CTimeSeries::Sum(CTimeSeries *pTS1, CTimeSeries *pTS2, string name
 //    :LinearTransform 1.0 0.0
 // :EndReadFromNetCDF
 //
-CTimeSeries *CTimeSeries::Parse(CParser *p, bool is_pulse, string name, long loc_ID, string gauge_name,const optStruct &Options, bool shift_to_per_ending)
+CTimeSeries *CTimeSeries::Parse(CParser *p, bool is_pulse, string name, long long loc_ID, string gauge_name,const optStruct &Options, bool shift_to_per_ending)
 {
 
   char   *s[MAXINPUTITEMS];
@@ -801,7 +812,7 @@ CTimeSeries *CTimeSeries::Parse(CParser *p, bool is_pulse, string name, long loc
   }
 
   // ANNUALCYCLE FORMAT ==========================================================
-  if(!strcmp(s[0],":AnnualCycle"))
+  if ((!strcmp(s[0],":AnnualCycle")) || (!strcmp(s[0],":AnnualCycleStep")))
   {
     if(Len<13){ ExitGracefully("CTimeSeries::Parse: incorrect format of AnnualCycle command",BAD_DATA); return NULL; }
     double *aVal;
@@ -810,9 +821,13 @@ CTimeSeries *CTimeSeries::Parse(CParser *p, bool is_pulse, string name, long loc
     time_struct tt;
     double aMonVal[12];
     for(int i=0;i<12;i++){ aMonVal[i]=s_to_d(s[i+1]); }
+    
+    monthly_interp interp_method=Options.month_interp;
+    if (!strcmp(s[0],":AnnualCycleStep")){interp_method=MONTHINT_UNIFORM;}
+
     for(int n=0;n<nVals;n++){
       JulianConvert(double(n),Options.julian_start_day,Options.julian_start_year-1,Options.calendar,tt);
-      aVal[n]=InterpolateMo(aMonVal,tt,Options);
+      aVal[n]=InterpolateMo(aMonVal,tt,interp_method,Options);
     }
     pTimeSeries=new CTimeSeries(name,loc_ID,p->GetFilename(),Options.julian_start_day,Options.julian_start_year-1,1.0,aVal,nVals,is_pulse);
     delete[] aVal; aVal =NULL;
@@ -882,8 +897,8 @@ CTimeSeries *CTimeSeries::Parse(CParser *p, bool is_pulse, string name, long loc
       if(!strcmp(s[1],"STEP"       )){step=true;}
     }
 
-    int    *days=new int    [(int)(DAYS_PER_YEAR)+1]; //sized for max # of events
-    double *vals=new double [(int)(DAYS_PER_YEAR)+1];
+    int    *days=new int    [366]; //sized for max # of events
+    double *vals=new double [366];
     int nEvents=0;
 
     p->Tokenize(s,Len);
@@ -896,7 +911,7 @@ CTimeSeries *CTimeSeries::Parse(CParser *p, bool is_pulse, string name, long loc
         days[nEvents]=GetJulianDayFromMonthYear(date_str,Options.calendar);
         vals[nEvents]=s_to_d(s[1]);
         nEvents++;
-        ExitGracefullyIf(nEvents>(int)(DAYS_PER_YEAR),"CTimeSeries::Parse: exceeded maximum number of items in :AnnualPattern command",BAD_DATA);
+        ExitGracefullyIf(nEvents>365,"CTimeSeries::Parse: exceeded maximum number of items in :AnnualPattern command",BAD_DATA);
       }
       else            { p->ImproperFormat(s); break; }
       bool eof=p->Tokenize(s,Len);
@@ -919,7 +934,7 @@ CTimeSeries *CTimeSeries::Parse(CParser *p, bool is_pulse, string name, long loc
         }
       }
       else { //interpolate with wraparound
-        double lastday=days[nEvents-1]-(int)(DAYS_PER_YEAR);
+        double lastday=days[nEvents-1]-365;
         double nextday=days[0];
         double lastval=vals[nEvents-1];
         double nextval=vals[0];
@@ -929,13 +944,12 @@ CTimeSeries *CTimeSeries::Parse(CParser *p, bool is_pulse, string name, long loc
             nextval=vals[i+1];nextday=days[i+1];
           }
         }
-        if (tt.julian_day > days[nEvents - 1]) {
+        if (tt.julian_day >= days[nEvents - 1]) {
           lastval=vals[nEvents - 1];  lastday=days[nEvents - 1];
-          nextval=vals[0];            nextday=days[0]+(int)(DAYS_PER_YEAR);
+          nextval=vals[0];            nextday=days[0]+365;
         }
         if ((nextday-lastday)==0){aVal[n]=lastval; }
         else{
-
           aVal[n]=(tt.julian_day-lastday)/(nextday-lastday)*(nextval-lastval)+lastval;
         }
       }
@@ -970,7 +984,6 @@ CTimeSeries *CTimeSeries::Parse(CParser *p, bool is_pulse, string name, long loc
     else{
       tstep =FixTimestep(s_to_d(s[2]));
     }
-
     nMeasurements=s_to_i(s[3]);
     //units =s[4]
   }
@@ -982,9 +995,9 @@ CTimeSeries *CTimeSeries::Parse(CParser *p, bool is_pulse, string name, long loc
     tstep        =FixTimestep(s_to_d(s[3]));
     //units =s[4]
   }
-  if (shift_to_per_ending)
+  if (shift_to_per_ending) //Just shifting by time step, not data interval (messy and used for HYDROGRAPHS only)
   {
-    start_day+=tstep;
+    start_day+=Options.timestep;
     int leap=0;
     if (IsLeapYear(start_yr,Options.calendar)){ leap = 1; }
     if (start_day>=365+leap){start_day-=365+leap; start_yr++;}
@@ -1356,7 +1369,7 @@ CTimeSeries **CTimeSeries::ParseEnsimTb0(string filename, int &nTS, forcing_type
 /// \param  loc_ID              [in] location information about timeseries, e.g. subbasin ID or HRU ID
 /// \param  FileNameNC          [in] file name of NetCDF
 /// \param  VarNameNC           [in] name of variable in NetCDF
-/// \param  DimNamesNC_stations [in] name of station dimension (optional; default=None)
+/// \param  DimNamesNC_stations [in] name of station dimension (optional; default="None")
 /// \param  DimNamesNC_time     [in] name of time dimension (mandatory)
 /// \param  StationIdx          [in] idx of station to be read (or -1 if to be determined from FEWS station_id variable via FROM_STATION_VAR) (only used if DimNamesNC:stations not None)
 /// \param  TimeShift           [in] time shift of data (fractional day by which read data should be shifted)
@@ -1365,7 +1378,9 @@ CTimeSeries **CTimeSeries::ParseEnsimTb0(string filename, int &nTS, forcing_type
 /// \return array (size nTS) of pointers to time series
 //
 CTimeSeries *CTimeSeries::ReadTimeSeriesFromNetCDF(const optStruct &Options, string name,
-                                                   long loc_ID, string gauge_name,bool shift_to_per_ending, bool shift_from_per_ending, string FileNameNC, string VarNameNC,
+                                                   long long loc_ID, string gauge_name,
+                                                   bool shift_to_per_ending, bool shift_from_per_ending,
+                                                   string FileNameNC, string VarNameNC,
                                                    string DimNamesNC_stations, string DimNamesNC_time,
                                                    int StationIdx, double TimeShift, double LinTrans_a, double LinTrans_b)
 {
@@ -1609,7 +1624,7 @@ CTimeSeries *CTimeSeries::ReadTimeSeriesFromNetCDF(const optStruct &Options, str
       int     stat_dimid;
       int     stat_varid;
       int     nStations;
-      long   *aStations    =NULL;
+      long   *aStations    =NULL; // \todo[funct]: support NetCDF stations with long long type.
       string *aStat_strings=NULL;
       GetNetCDFStationArray(ncid, FileNameNC,stat_dimid,stat_varid, aStations,aStat_strings, nStations);
       if (loc_ID!=DOESNT_EXIST) // Time series linked to SubBasin or HRU
@@ -1672,7 +1687,7 @@ CTimeSeries *CTimeSeries::ReadTimeSeriesFromNetCDF(const optStruct &Options, str
       retval=nc_get_vars_double(ncid,varid_f,nc_start,nc_length,nc_stride,&aTmp2D[0][0]);   HandleNetCDFErrors(retval);
     }
     if (Options.noisy) {
-      cout<<" CForcingGrid::ReadTimeSeriesFromNetCDF - !none"<<endl;
+      cout<<" CTimeSeries::ReadTimeSeriesFromNetCDF - !none"<<endl;
       printf("  Dim of chunk read: dim1 = %i   dim2 = %i\n",dim1,dim2);
       printf("  start  chunk: (%zu, %zu)\n", nc_start[0], nc_start[1]);
       printf("  length chunk: (%zu, %zu)\n", nc_length[0],nc_length[1]);
@@ -1689,7 +1704,7 @@ CTimeSeries *CTimeSeries::ReadTimeSeriesFromNetCDF(const optStruct &Options, str
     nc_start [0] = 0;  nc_length[0] = (size_t)(ntime);  nc_stride[0] = 1;
     retval=nc_get_vars_double(ncid,varid_f,nc_start,nc_length,nc_stride,&aTmp1D[0]);    HandleNetCDFErrors(retval);
     if (Options.noisy) {
-      cout<<" CForcingGrid::ReadTimeSeriesFromNetCDF - none"<<endl;
+      cout<<" CTimeSeries::ReadTimeSeriesFromNetCDF - none"<<endl;
       printf("  Dim of chunk read: dim1 = %i \n",dim1);
       printf("  start  chunk: (%zu)\n", nc_start[0]);
       printf("  length chunk: (%zu)\n", nc_length[0]);

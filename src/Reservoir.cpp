@@ -8,14 +8,14 @@
 //////////////////////////////////////////////////////////////////
 /// \brief Base Constructor for reservoir called by all other constructors
 /// \param Name [in] Nickname for reservoir
-/// \param SubID [in] subbasin ID
+/// \param SBID [in] subbasin ID
 /// \param typ [in] reservoir type
 /// \details needed because versions of c++ prior to v11 don't necessaarily support delegating constructors
-//  
-void CReservoir::BaseConstructor(const string Name,const long SubID)
+//
+void CReservoir::BaseConstructor(const string Name,const long long SBID)
 {
   _name=Name;
-  _SBID=SubID;
+  _SBID=SBID;
 
   _pDownSB=NULL;
   _Q_dn_old = 0.0;
@@ -105,12 +105,12 @@ void CReservoir::BaseConstructor(const string Name,const long SubID)
 //////////////////////////////////////////////////////////////////
 /// \brief Base Constructor for reservoir
 /// \param Name [in] Nickname for reservoir
-/// \param SubID [in] subbasin ID
+/// \param SBID [in] subbasin ID
 /// \param typ [in] reservoir type
 //
-CReservoir::CReservoir(const string Name,const long SubID)
+CReservoir::CReservoir(const string Name,const long long SBID)
 {
-  BaseConstructor(Name,SubID);
+  BaseConstructor(Name,SBID);
 }
 
 //////////////////////////////////////////////////////////////////
@@ -125,8 +125,7 @@ CReservoir::CReservoir(const string Name,const long SubID)
 /// \param b_A [in] power law exponent for area rating curve [-] (0 for prismatic reservoir)
 
 //
- 
-CReservoir::CReservoir(const string Name, const long SBID,
+CReservoir::CReservoir(const string Name, const long long SBID,
                        const double a_V,  const double b_V,
                        const double a_Q,  const double b_Q,
                        const double a_A,  const double b_A,
@@ -175,18 +174,18 @@ CReservoir::CReservoir(const string Name, const long SBID,
 //////////////////////////////////////////////////////////////////
 /// \brief Constructor for reservoir using lookup table rating curves
 /// \param Name [in] Nickname for reservoir
-/// \param SubID [in] subbasin ID
+/// \param SBID [in] subbasin ID
 /// \param a_ht[] [in] array of reservoir stages [size: nPoints]
 /// \param a_Q[] [in] array of reservoir discharges [size: nPoints]
 /// \param a_A[] [in] array of reservoir areas [size: nPoints]
 /// \param a_V[] [in] array of reservoir volumes [size: nPoints]
 //
-CReservoir::CReservoir(const string Name, const long SubID,
+CReservoir::CReservoir(const string Name, const long long SBID,
                        const double *a_ht,
                        const double *a_Q, const double *a_Qund,const double *a_A, const double *a_V,
                        const int     nPoints,const CModelABC* pModel)
 {
-   BaseConstructor(Name,SubID);
+   BaseConstructor(Name,SBID);
 
   _min_stage =ALMOST_INF;
   _max_stage=-ALMOST_INF;
@@ -219,20 +218,20 @@ CReservoir::CReservoir(const string Name, const long SubID,
 
     // QA/QC:
     if ((i > 0) && ((_aStage[i]-_aStage[i-1])<0)){
-      warn = "CReservoir::constructor: stage relations must be specified in order of increasing stage. [bad reservoir: " + _name + " "+to_string(SubID)+"]";
-      ExitGracefully(warn.c_str(),BAD_DATA_WARN);
+      warn = "CReservoir::constructor: stage relations must be specified in order of increasing stage. [bad reservoir: " + _name + " "+to_string(SBID)+"]";
+      ExitGracefully(warn.c_str(),BAD_DATA_WARN);return;
     }
     if ((i > 0) && ((_aVolume[i] - _aVolume[i-1]) <= -REAL_SMALL)){
-      warn = "CReservoir::constructor: volume-stage relationships must be monotonically increasing for all stages. [bad reservoir: " + _name + " "+to_string(SubID)+"]";
-      ExitGracefully(warn.c_str(),BAD_DATA_WARN);
+      warn = "CReservoir::constructor: volume-stage relationships must be monotonically increasing for all stages. [bad reservoir: " + _name + " "+to_string(SBID)+"]";
+      ExitGracefully(warn.c_str(),BAD_DATA_WARN);return;
     }
     if ((i > 0) && ((_aQ[i] - _aQ[i-1]) < -REAL_SMALL)){
-      warn = "CReservoir::constructor: stage-discharge relationships must be increasing or flat for all stages. [bad reservoir: " + _name + " "+to_string(SubID)+ "]";
-      ExitGracefully(warn.c_str(),BAD_DATA_WARN);
+      warn = "CReservoir::constructor: stage-discharge relationships must be increasing or flat for all stages. [bad reservoir: " + _name + " "+to_string(SBID)+ "]";
+      ExitGracefully(warn.c_str(),BAD_DATA_WARN);return;
     }
     if ((i > 0) && ((_aQunder[i] - _aQunder[i-1]) < -REAL_SMALL)){
-      warn = "CReservoir::constructor: stage-discharge (underflow) relationships must be increasing or flat for all stages. [bad reservoir: " + _name + " "+to_string(SubID)+ "]";
-      ExitGracefully(warn.c_str(),BAD_DATA_WARN);
+      warn = "CReservoir::constructor: stage-discharge (underflow) relationships must be increasing or flat for all stages. [bad reservoir: " + _name + " "+to_string(SBID)+ "]";
+      ExitGracefully(warn.c_str(),BAD_DATA_WARN);return;
     }
   }
   _max_capacity=_aVolume[_Np-1];
@@ -242,7 +241,7 @@ CReservoir::CReservoir(const string Name, const long SubID,
 //////////////////////////////////////////////////////////////////
 /// \brief Constructor for reservoir using VARYING lookup table rating curves
 /// \param Name [in] Nickname for reservoir
-/// \param SubID [in] subbasin ID
+/// \param SBID [in] subbasin ID
 /// \param nDates [in] # of flow rating curves
 /// \param aDates [in] array of julian days (integer <366) at which rating curve changes
 /// \param a_ht[] [in] array of reservoir stages [size: nPoints]
@@ -250,7 +249,7 @@ CReservoir::CReservoir(const string Name, const long SubID,
 /// \param a_A[] [in] array of reservoir volumes [size: nPoints]
 /// \param a_V[] [in] array of reservoir areas [size: nPoints]
 //
-CReservoir::CReservoir(const string Name, const long SubID,
+CReservoir::CReservoir(const string Name, const long long SBID,
                        const int my_nDates, const int *my_aDates,
                        const double *a_ht,
                        double      **a_QQ,
@@ -260,7 +259,7 @@ CReservoir::CReservoir(const string Name, const long SubID,
                        const int     nPoints,
                        const CModelABC* pModel)
 {
-  BaseConstructor(Name,SubID);
+  BaseConstructor(Name,SBID);
 
   _nDates=my_nDates;
   _aDates = new int[_nDates];
@@ -300,20 +299,20 @@ CReservoir::CReservoir(const string Name, const long SubID,
     for (int v = 0; v < _nDates; v++){
       _aQ_back[v][i] = a_QQ[v][i];
       if ((i > 0) && ((_aQ_back[v][i] - _aQ_back[v][i-1]) < -REAL_SMALL)){
-        warn = "CReservoir::constructor: stage-discharge relationships must be increasing or flat for all stages. [bad varying reservoir: " + _name + " "+to_string(SubID)+ "]";
+        warn = "CReservoir::constructor: stage-discharge relationships must be increasing or flat for all stages. [bad varying reservoir: " + _name + " "+to_string(SBID)+ "]";
         ExitGracefully(warn.c_str(),BAD_DATA_WARN);
       }
     }
     if ((i > 0) && ((_aVolume[i] - _aVolume[i-1]) <= -REAL_SMALL)){
-      warn = "CReservoir::constructor: volume-stage relationships must be monotonically increasing for all stages. [bad reservoir: " + _name + " "+to_string(SubID)+"]";
+      warn = "CReservoir::constructor: volume-stage relationships must be monotonically increasing for all stages. [bad reservoir: " + _name + " "+to_string(SBID)+"]";
       ExitGracefully(warn.c_str(),BAD_DATA_WARN);
     }
     if ((i > 0) && ((_aQ[i] - _aQ[i-1]) < -REAL_SMALL)){
-      warn = "CReservoir::constructor: stage-discharge relationships must be increasing or flat for all stages. [bad reservoir: " + _name + " "+to_string(SubID)+ "]";
+      warn = "CReservoir::constructor: stage-discharge relationships must be increasing or flat for all stages. [bad reservoir: " + _name + " "+to_string(SBID)+ "]";
       ExitGracefully(warn.c_str(),BAD_DATA_WARN);
     }
     if ((i > 0) && ((_aQunder[i] - _aQunder[i-1]) < -REAL_SMALL)){
-      warn = "CReservoir::constructor: stage-discharge relationships (underflow) must be increasing or flat for all stages. [bad reservoir: " + _name + " "+to_string(SubID)+ "]";
+      warn = "CReservoir::constructor: stage-discharge relationships (underflow) must be increasing or flat for all stages. [bad reservoir: " + _name + " "+to_string(SBID)+ "]";
       ExitGracefully(warn.c_str(),BAD_DATA_WARN);
     }
   }
@@ -323,14 +322,14 @@ CReservoir::CReservoir(const string Name, const long SubID,
 //////////////////////////////////////////////////////////////////
 /// \brief Constructor for prismatic lake reservoir controlled by weir coefficient
 /// \param Name [in] Nickname for reservoir
-/// \param SubID [in] subbasin ID
+/// \param SBID [in] subbasin ID
 /// \param weircoeff [in] weir coefficient, <1.0
 /// \param crestw [in] width of crest, [m]
 /// \param A  [in] area of reservoir [m2]
 /// \param depth [in] maximum depth of prismatic reservoir
 //
 CReservoir::CReservoir(const string Name,
-                       const long   SubID,
+                       const long long SBID,
                        const double weircoeff,
                        const double crestw,
                        const double crestht,
@@ -338,7 +337,7 @@ CReservoir::CReservoir(const string Name,
                        const double depth,
                        const CModelABC* pModel)
 {
-   BaseConstructor(Name,SubID);
+   BaseConstructor(Name,SBID);
 
   _crest_width=crestw;
   _crest_ht   =crestht;
@@ -421,7 +420,7 @@ CReservoir::~CReservoir()
 //////////////////////////////////////////////////////////////////
 /// \returns Subbasin ID
 //
-long  CReservoir::GetSubbasinID          () const { return _SBID; }
+long long CReservoir::GetSubbasinID          () const { return _SBID; }
 
 /// \returns mixing depth [m]
 //
@@ -661,7 +660,7 @@ string CReservoir::GetRegimeName(const int i,const time_struct &tt) const
 /// \brief returns subbasin ID of recipient of control structure i's outflow
 /// \param i [in] control structure index (must be in range from 0...nControlStructures)
 //
-long   CReservoir::GetControlFlowTarget(const int i) const
+long long  CReservoir::GetControlFlowTarget(const int i) const
 {
   return _pControlStructures[i]->GetTargetBasinID();
 }
@@ -937,7 +936,7 @@ void    CReservoir::AddMinQTimeSeries(CTimeSeries *pQmin) {
 //
 void    CReservoir::AddMaxQTimeSeries(CTimeSeries *pQmax) {
   ExitGracefullyIf(_pQmaxTS!=NULL,
-    "CReservoir::AddMinQTimeSeries: only one minimum flow time series may be specified per reservoir",BAD_DATA_WARN);
+    "CReservoir::AddMaxQTimeSeries: only one minimum flow time series may be specified per reservoir",BAD_DATA_WARN);
   _pQmaxTS=pQmax;
 }
 //////////////////////////////////////////////////////////////////
@@ -1060,7 +1059,7 @@ void CReservoir::SetLakeLyrConvectionCoeff(const double& conv) {
 string CReservoir::GetCurrentConstraint() const {
   switch(_constraint)
   {
-  case(RC_MAX_STAGE):         {return "MAX_STAGE"; }
+  case(RC_MAX_STAGE):         {return "RC_MAX_STAGE"; }
   case(RC_MIN_STAGE):         {return "RC_MIN_STAGE"; }
   case(RC_NATURAL):           {return "RC_NATURAL"; }
   case(RC_TARGET):            {return "RC_TARGET"; }
@@ -1211,12 +1210,12 @@ void CReservoir::SetDZTRModel(const double Qmc,const double Smax,
 //
 double CReservoir::GetDZTROutflow(const double &V, const double &Qin, const time_struct &tt, const optStruct &Options) const
 {
-  double Vci=InterpolateMo(_pDZTR->Vci,tt,Options);
-  double Vni=InterpolateMo(_pDZTR->Vni,tt,Options);
-  double Vmi=InterpolateMo(_pDZTR->Vmi,tt,Options);
-  double Qci=InterpolateMo(_pDZTR->Qci,tt,Options);
-  double Qni=InterpolateMo(_pDZTR->Qni,tt,Options);
-  double Qmi=InterpolateMo(_pDZTR->Qmi,tt,Options);
+  double Vci=InterpolateMo(_pDZTR->Vci,tt,Options.month_interp,Options);
+  double Vni=InterpolateMo(_pDZTR->Vni,tt,Options.month_interp,Options);
+  double Vmi=InterpolateMo(_pDZTR->Vmi,tt,Options.month_interp,Options);
+  double Qci=InterpolateMo(_pDZTR->Qci,tt,Options.month_interp,Options);
+  double Qni=InterpolateMo(_pDZTR->Qni,tt,Options.month_interp,Options);
+  double Qmi=InterpolateMo(_pDZTR->Qmi,tt,Options.month_interp,Options);
   double Vmin=0.1*_pDZTR->Vmax;
   double Qmc=_pDZTR->Qmc;
   double tstep=Options.timestep*SEC_PER_DAY;
@@ -1263,6 +1262,21 @@ double CReservoir::ScaleFlow(const double& scale,const bool overriding, const do
 
   return va;
 }
+double CReservoir::AdjustFlow(const double& Qadjust, const bool overriding, const double& tstep, const double& t)
+{
+  double scale=(_Qout+Qadjust)/_Qout;
+  if (_Qout=0){scale=1.0;}
+
+  double va=0.0; //volume added
+  double sf=(scale-1.0)/scale;
+
+  _DAscale=scale;
+
+  //Estimate volume added through scaling
+  va+=0.5*(_Qout_last+_Qout)*sf*tstep*SEC_PER_DAY;
+
+  return va;
+}
 /////////////////////////////////////////////////////////////////
 /// \brief update demand magnitudes, called in solver at start of every time step
 /// \param &Options [in] Global model options information
@@ -1292,7 +1306,7 @@ void  CReservoir::UpdateStage(const double &new_stage,const double &res_outflow,
   _Qout      =res_outflow;
   for (int i = 0; i < _nControlStructures; i++) {
     _aQstruct_last[i]=_aQstruct[i];
-    _aQstruct[i]=aQstruct_new[i];
+    _aQstruct     [i]=aQstruct_new[i];
   }
 
   _DAscale_last=_DAscale;
@@ -1502,7 +1516,7 @@ void  CReservoir::SetInitialFlow(const double &initQ,const double &initQlast,con
 //
 void CReservoir::SetControlFlow(const int i, const double& Q, const double& Qlast)
 {
-  _aQstruct[i]=Q;
+  _aQstruct     [i]=Q;
   _aQstruct_last[i]=Qlast;
 }
 
@@ -1571,7 +1585,7 @@ double  CReservoir::RouteWater(const double &Qin_old,
 {
   if ((_assimilate_stage) && (!_assim_blank))
   {
-    res_outflow=_Qout;
+    res_outflow=_Qout;//stage from data, outflow calculated from SD curve in UpdateReservoir()
     return _stage;
   }
 
@@ -1860,7 +1874,7 @@ double  CReservoir::RouteWater(const double &Qin_old,
   // ======================================================================================
 
   double total_outflow=res_outflow;
-  int downID=DOESNT_EXIST;
+  long long downID=DOESNT_EXIST;
   if (_pDownSB!=NULL){downID=_pDownSB->GetID();}
   for(int i=0; i<_nControlStructures; i++)
   {

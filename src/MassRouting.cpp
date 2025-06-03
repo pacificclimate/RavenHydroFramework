@@ -116,8 +116,8 @@ void   CConstituentModel::SetMassInflows(const int p,const double Minnew)
 void   CConstituentModel::ApplySpecifiedMassInflows(const int p,const double t,double &Minnew)
 {
   double C;
-  long   SBID=_pModel->GetSubBasin(p)->GetID();
-  double    Q=_pModel->GetSubBasin(p)->GetOutflowRate()*SEC_PER_DAY; //[m3/d] Flow at end of time step
+  long long SBID=_pModel->GetSubBasin(p)->GetID();
+  double       Q=_pModel->GetSubBasin(p)->GetOutflowRate()*SEC_PER_DAY; //[m3/d] Flow at end of time step
 
   //Handle additional mass/energy inflows
   for(int i=0; i<_nMassLoadingTS; i++) {
@@ -150,7 +150,7 @@ void   CConstituentModel::ApplySpecifiedMassInflows(const int p,const double t,d
 double   CConstituentModel::GetMassAddedFromInflowSources(const double &t,const double &tstep) const
 {
   double C,Q,Qold;
-  long SBID,SBID_down;
+  long long SBID,SBID_down;
   double mass=0; //[mg] or [MJ]
 
   // remove mass which is overridden by specified mass inflow
@@ -221,14 +221,14 @@ void  CConstituentModel::PrepareForRouting(const int p) {
 void  CConstituentModel::PrepareForInCatchmentRouting(const int p) {
   //does nothing - interesting in child classes
 }
-void CConstituentModel::InCatchmentRoute(const int p, double &Mlat_new, const optStruct &Options) 
+void CConstituentModel::InCatchmentRoute(const int p, double &Mlat_new, const optStruct &Options)
 {
   PrepareForInCatchmentRouting(p);
 
   const double * aUnitHydro =_pModel->GetSubBasin(p)->GetUnitHydrograph();
   const double * aQlatHist  =_pModel->GetSubBasin(p)->GetLatHistory();
   Mlat_new=ApplyInCatchmentRouting(p,aUnitHydro,aQlatHist,_aMlatHist[p],_nMlatHist[p], Options.timestep);
-  
+
   _aMlocLast[p] = _aMlocal[p];
   _aMlocal  [p] = Mlat_new;
 }
@@ -266,7 +266,7 @@ void   CConstituentModel::RouteMass(const int          p,          // SB index
   //==============================================================
   const double * aRouteHydro=_pModel->GetSubBasin(p)->GetRoutingHydrograph();
   const double * aQinHist   =_pModel->GetSubBasin(p)->GetInflowHistory();
-  
+
   int nSegments   =_pModel->GetSubBasin(p)->GetNumSegments();
   double seg_fraction=1.0/(double)(nSegments);
 
@@ -284,7 +284,7 @@ void   CConstituentModel::RouteMass(const int          p,          // SB index
   else {
     ExitGracefully("Unrecognized or unsupported constiuent routing method (:Routing command must be ROUTE_NONE, ROUTE_PLUG_FLOW, or ROUTE_DIFFUSIVE_WAVE to support transport)",STUB);
   }
-  
+
   //all fluxes from catchment are routed directly to basin outlet (unless handled in convolution routing as source term)
   if ((!_lateral_via_convol) || (_pModel->GetSubBasin(p)->IsHeadwater())){
     aMout_new[nSegments-1]+=Mlat_new;
@@ -436,7 +436,7 @@ void   CConstituentModel::UpdateMassOutflows( const int     p,
   if (!_lateral_via_convol){//elsewise, in get net reach losses
     dM+=0.5*(Mlat_new+_aMlat_last[p])*dt;
   }
-  
+
   _channel_storage[p]+=dM;//[mg] or [MJ]
 
   //Update rivulet storage
