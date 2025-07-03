@@ -319,7 +319,7 @@ public:/*-------------------------------------------------------*/
   virtual void   PrepareForRouting        (const int p);
           void   RouteMass                (const int p,      double *aMoutnew,double &Mlat_new,double &ResMass,double &ResSedMass, const optStruct &Options,const time_struct &tt) const;
   virtual void   RouteMassInReservoir     (const int p,const double *aMoutnew,                 double &ResMass,double &ResSedMass, const optStruct &Options,const time_struct &tt) const;
-          void   UpdateMassOutflows       (const int p,const double *aMoutnew,const double &Mlat_new,const double &ResMass,const double &ResSedMass, double &MassOutflow,
+  virtual void   UpdateMassOutflows       (const int p,const double *aMoutnew,const double &Mlat_new,const double &ResMass,const double &ResSedMass, double &MassOutflow,
                                            const optStruct &Options,const time_struct &tt,const bool initialize);
 
   virtual void   WriteOutputFileHeaders      (const optStruct &Options);

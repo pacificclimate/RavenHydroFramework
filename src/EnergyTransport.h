@@ -94,6 +94,8 @@ public:/*-------------------------------------------------------*/
                                   const double* aMoutnew, double& ResMass, double& ResSedMass,
                                   const optStruct   &Options,
                                   const time_struct &tt) const;
+  void   UpdateMassOutflows      (const int p,const double *aMoutnew,const double &Mlat_new,const double &ResMass,const double &ResSedMass, double &MassOutflow,
+                                  const optStruct &Options,const time_struct &tt,const bool initialize);
 
   void   WriteOutputFileHeaders      (const optStruct& Options);
   void   WriteMinorOutput            (const optStruct& Options,const time_struct& tt);

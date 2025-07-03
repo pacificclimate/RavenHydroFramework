@@ -94,7 +94,8 @@ double CEnthalpyModel::GetOutflowConcentration(const int p) const
     return ConvertVolumetricEnthalpyToTemperature(hv); //[C]
   }
   else {
-    return ConvertVolumetricEnthalpyToTemperature(_aMres[p]/pRes->GetStorage());
+    //Outflow from epilimnion only
+    return ConvertVolumetricEnthalpyToTemperature(_aMres[p]/(pRes->GetStorage() - pRes->GetHypolimnionStorage()));
   }
 }
 //////////////////////////////////////////////////////////////////
@@ -1148,6 +1149,97 @@ void    CEnthalpyModel::ApplyConvolutionRouting(const int p,const double *aRoute
     //_aBedTemp[p] +=k*(_aTave_reach[p] - _aBedTemp[p]) * tstep;
     _aBedTemp[p] = _aBedTemp[p]*(ee)+_aTave_reach[p]*(1.0-ee);
   }
+}
+
+//////////////////////////////////////////////////////////////////
+/// \brief Sets mass outflow from primary channel and updates flow history
+/// \details Also recalculates channel storage (uglier than desired)
+/// \remark Called *after* RouteMass routine is called in Solver.cpp, to reset
+/// the mass outflow rates for this basin
+///
+/// \param **aMoutnew     [in] Array of new mass outflows [MJ/d] [size:  nsegments x _nConstituents]
+/// \param ResMass        [in] new reservoir mass [MJ]
+/// \param ResMass        [in] new reservoir sediment mass [MJ]
+/// \param MassOutflow    [out] new mass outflow [MJ/d] from last segment or reservoir
+/// \param &Options       [in] Global model options information
+/// \param initialize     [in] Flag to indicate if flows are to only be initialized
+//
+void   CEnthalpyModel::UpdateMassOutflows( const int     p,
+                                           const double *aMoutnew,
+                                           const double &Mlat_new,
+                                           const double &ResMass,
+                                           const double &ResSedMass,
+                                                 double &MassOutflow,
+                                           const optStruct &Options,
+                                           const time_struct &tt,
+                                           const bool    initialize)
+{
+  double tstep=Options.timestep;
+
+  CSubBasin *pBasin=_pModel->GetSubBasin(p);
+
+  //Update mass flows
+  //------------------------------------------------------
+  _aMout_last[p]=_aMout[p][pBasin->GetNumSegments()-1];
+  for(int seg=0;seg<pBasin->GetNumSegments();seg++) {
+    _aMout[p][seg]=aMoutnew[seg];
+  }
+  MassOutflow=_aMout[p][pBasin->GetNumSegments()-1];// is now the new mass outflow from the channel
+
+
+  //Update reservoir concentrations
+  //-----------------------------------------------------
+  CReservoir *pRes=_pModel->GetSubBasin(p)->GetReservoir();
+  if(pRes!=NULL)
+  {
+    _aMres_last    [p]=_aMres[p];
+    _aMres         [p]=ResMass;
+
+    _aMout_res_last[p]=_aMout_res[p];
+    //Enthalpy outflow from epilimnion layer only
+    _aMout_res     [p]=((pRes->GetOutflowRate()*SEC_PER_DAY)/(pRes->GetStorage() - pRes->GetHypolimnionStorage()))*_aMres[p]; //[MJ/d]
+
+    _aMsed_last    [p]=_aMsed[p];
+    _aMsed         [p]=ResSedMass;
+
+    MassOutflow=_aMout_res[p];
+  }
+
+  if(initialize) { return; }//entering initial conditions
+
+  //Update channel storage
+  //------------------------------------------------------
+  double dt=tstep;
+  double dM=0.0;
+
+  //mass change from linearly varying upstream inflow over time step
+  dM+=0.5*(_aMinHist[p][0]+_aMinHist[p][1])*dt;
+
+  //mass change from linearly varying downstream outflow over time step
+  dM-=0.5*(_aMout[p][pBasin->GetNumSegments()-1]+_aMout_last[p])*dt;
+
+  //energy change from loss of mass/energy in-catchment over time step
+  dM-=GetCatchmentTransitLosses(p);
+
+  //energy change from loss of mass/energy along reach over time step
+  dM-=GetNetReachLosses(p);
+
+  //mass change from lateral inflows
+  if (!_lateral_via_convol){//elsewise, in get net reach losses
+    dM+=0.5*(Mlat_new+_aMlat_last[p])*dt;
+  }
+
+  _channel_storage[p]+=dM;//[MJ]
+
+  //Update rivulet storage
+  //------------------------------------------------------
+  dM=0.0;
+  dM+=_aMlatHist[p][0]*dt;//inflow from land surface (integrated over time step)
+  dM-=0.5*(Mlat_new+_aMlat_last[p])*dt;//outflow to channel (integrated over time step)
+
+  _rivulet_storage[p]+=dM;//[MJ]
+
+  _aMlat_last[p]=Mlat_new;
 }
 
 //////////////////////////////////////////////////////////////////
