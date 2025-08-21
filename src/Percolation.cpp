@@ -123,6 +123,14 @@ void CmvPercolation::GetParticipatingParamList(string  *aP, class_type *aPC , in
     nP=1;
     aP[0]="PERC_ASPEN"; aPC[0]=CLASS_SOIL;
   }
+  else if (type==PERC_VIC)
+  {
+    nP=4;
+    aP[0]="HYDRAUL_COND"; aPC[0]=CLASS_SOIL;
+    aP[1]="CLAPP_B";      aPC[1]=CLASS_SOIL;
+    aP[2]="POROSITY";     aPC[2]=CLASS_SOIL;
+    aP[3]="SAT_RES";      aPC[3]=CLASS_SOIL;
+  }
   else
   {
     ExitGracefully("CmvPercolation::GetParticipatingParamList: undefined percolation algorithm",BAD_DATA);
@@ -318,6 +326,26 @@ void   CmvPercolation::GetRatesOfChange( const double                   *state_v
     rates[0]=pHRU->GetSoilProps(m)->perc_aspen;
   }
   //-----------------------------------------------------------------
+  else if (type==PERC_VIC)
+  {
+    // Brooks & Corey relation for hydraulic conductivity
+    double resid_stor, ksat, clapp_b;
+  
+    resid_stor = pHRU->GetSoilProps(m)->sat_res;
+    ksat       = pHRU->GetSoilProps(m)->hydraul_cond;
+    clapp_b    = pHRU->GetSoilProps(m)->clapp_b;
+
+    if(stor > resid_stor) {
+      rates[0] = ksat * pow((stor-resid_stor)/(max_stor-resid_stor), 2.0*clapp_b+3.0);
+    }
+    else {
+      rates[0]=0.0;
+    }
+    
+    //Ensure percolation does not reduce mositure below residual storage
+    rates[0]=threshMin(rates[0], (stor-resid_stor)/Options.timestep, 0.0);
+
+  }
   //-----------------------------------------------------------------
   else
   {

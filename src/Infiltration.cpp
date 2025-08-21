@@ -397,16 +397,26 @@ void CmvInfiltration::GetRatesOfChange (const double              *state_vars,
   //-----------------------------------------------------------------
   else if (type==INF_VIC_ARNO)
   {
-    double sat_area,stor,max_stor,b,sat;
+    double sat_area,stor,max_stor,b,sat,ex,im,io,basis;
 
-    stor    =state_vars[iTopSoil];
-    max_stor=pHRU->GetSoilCapacity(0);        //maximum storage of top soil layer [mm]
-    b       =pHRU->GetSoilProps(0)->VIC_b_exp;//ARNO/VIC b exponent for runoff [-]
-    sat     =min(stor/max_stor,1.0);          //soil saturation
-    sat_area=1.0 - pow(1.0-sat,b);            //saturated area [-] fraction
+    stor    =state_vars[iTopSoil];             //storage in top soil layer [mm]
+    max_stor=pHRU->GetSoilCapacity(0);         //maximum storage of top soil layer [mm]
+    b       =pHRU->GetSoilProps(0)->VIC_b_exp; //ARNO/VIC b exponent for runoff [-]
+    
+    ex      =b/(1+b);                          //exponent [-]
+    sat     =min(stor/max_stor,1.0);           //soil saturation fraction [-]
+    sat_area=1.0-pow(1.0-sat,ex);              //saturated area fraction
+    im      =(1+b)*max_stor;                   //maximum infiltration rate [mm/day]
+    io      =im*(1-pow(1-sat_area,1/b));       //point infiltration rate [mm/day]
 
-    runoff  =sat_area*rainthru;
-
+    if (rainthru==0.0) runoff=0.0;      //no runoff and no infiltration
+    else if (im==0.0) runoff=rainthru;  //no infiltration; everything runs off
+    else if ((io+rainthru)>im)
+      runoff=rainthru-(max_stor-stor);
+    else {
+      basis=1.0-(io+rainthru)/im;
+      runoff=rainthru-(max_stor-stor) + max_stor*pow(basis,b+1);
+    }
     runoff=(Fimp)*rainthru+(1-Fimp)*runoff; //correct for impermeable surfaces
 
     rates[0]=rainthru-runoff;

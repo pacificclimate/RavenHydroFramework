@@ -80,8 +80,9 @@ struct soil_struct
   double VIC_zmax;          ///< [mm]
   double VIC_alpha;         ///< [-]
   double VIC_evap_gamma;    ///< [-]       power law exponent for VIC soil evaporation
-
   double VIC_b_exp;         ///< [-]       power law exponent for VIC_ARNO infiltration model \ref (Clark et al, 2008)
+  double VIC_baseflow_ds;   ///< [-]       VIC/ARNO fraction of max_baseflow_rate at which non-linear baseflow occurs
+  double VIC_baseflow_ws;   ///< [-]       VIC/ARNO fraction of maximum soil storage at which non-linear baseflow occurs
 
   double max_perc_rate;     ///< [mm/d]    VIC/ARNO/GAWSER percolation rate - user defined between 0.010 - 1000.0
   double perc_coeff;        ///< [1/d]     Linear percolation storage coefficient

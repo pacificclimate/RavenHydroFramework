@@ -79,9 +79,10 @@ void CmvBaseflow::GetParticipatingParamList(string *aP, class_type *aPC, int &nP
   }
   else if (type==BASE_VIC)
   {
-    nP=2;
+    nP=3;
     aP[0]="MAX_BASEFLOW_RATE"; aPC[0]=CLASS_SOIL;
-    aP[1]="BASEFLOW_N";        aPC[1]=CLASS_SOIL;
+    aP[1]="VIC_BASEFLOW_DS";   aPC[1]=CLASS_SOIL;
+    aP[2]="VIC_BASEFLOW_WS";   aPC[2]=CLASS_SOIL;
   }
   else if (type==BASE_TOPMODEL)
   {
@@ -220,12 +221,26 @@ void   CmvBaseflow::GetRatesOfChange( const double      *storage,
   }
   //-----------------------------------------------------------------
   else if (type==BASE_VIC)
-  { // VIC Model
-    double max_rate,n;
+  { // VIC baseflow model, which uses ARNO formulation.
+    // Baseflow recession curve is linear below threshold
+    // of Ws*max_stor and non-linear above this threshold.
+    // The first derivative at teh transition from linear
+    // to non-linear is continuous
+    double max_rate,Ds,Ws;
+    double term1,term2,term3;
     max_rate = pSoil->max_baseflow_rate;
-    n        = pSoil->baseflow_n;
+    Ds       = pSoil->VIC_baseflow_ds;
+    Ws       = pSoil->VIC_baseflow_ws;
 
-    rates[0]=max_rate * pow(stor/max_stor,n);
+    term1=Ds*max_rate/(Ws*max_stor)*stor;
+    if(stor <= Ws*max_stor){
+      rates[0]=term1;
+    }
+    else {
+      term2=max_rate-Ds*max_rate/Ws;
+      term3=pow((stor-Ws*max_stor)/(max_stor-Ws*max_stor),2.0);
+      rates[0]=term1 + term2*term3;
+    }
   }
   //-----------------------------------------------------------------
   else if (type==BASE_TOPMODEL)

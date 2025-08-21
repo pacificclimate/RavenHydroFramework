@@ -2306,6 +2306,7 @@ bool ParseMainInputFile (CModel     *&pModel,
       else if (!strcmp(s[1],"PERC_GR4JEXCH"   )){p_type=PERC_GR4JEXCH;}
       else if (!strcmp(s[1],"PERC_GR4JEXCH2"  )){p_type=PERC_GR4JEXCH2;}
       else if (!strcmp(s[1],"PERC_ASPEN"      )){p_type=PERC_ASPEN;}
+      else if (!strcmp(s[1],"PERC_VIC"        )){p_type=PERC_VIC;}
       else {
         ExitGracefully("ParseMainInputFile: Unrecognized percolation process representation",BAD_DATA_WARN); break;
       }

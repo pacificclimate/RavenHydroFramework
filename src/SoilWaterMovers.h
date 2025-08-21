@@ -209,7 +209,8 @@ enum perc_type
   PERC_GR4J,      ///< percolation method from GR4J model
   PERC_GR4JEXCH,  ///< groundwater exchange from GR4J model
   PERC_GR4JEXCH2, ///< groundwater exchange from GR4J model
-  PERC_ASPEN      ///< percolation to aspen trees (S. Grass, 2018)
+  PERC_ASPEN,     ///< percolation to aspen trees (S. Grass, 2018)
+  PERC_VIC        ///< percolation method from VIC model
 };
 
 ////////////////////////////////////////////////////////////////////
