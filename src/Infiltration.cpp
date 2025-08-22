@@ -397,6 +397,12 @@ void CmvInfiltration::GetRatesOfChange (const double              *state_vars,
   //-----------------------------------------------------------------
   else if (type==INF_VIC_ARNO)
   {
+    // ARNO varibale infiltration curve model
+    // Routine to compute infiltration based in infiltration rate
+    // that varies with degree of soil stauration (as saturated
+    // area). Degree of saturation based on moisture in top soil
+    // layer. Intended to be combined with SOILEVAP_VIC.
+    
     double sat_area,stor,max_stor,b,sat,ex,im,io,basis;
 
     stor    =state_vars[iTopSoil];             //storage in top soil layer [mm]
@@ -409,6 +415,7 @@ void CmvInfiltration::GetRatesOfChange (const double              *state_vars,
     im      =(1+b)*max_stor;                   //maximum infiltration rate [mm/day]
     io      =im*(1-pow(1-sat_area,1/b));       //point infiltration rate [mm/day]
 
+    //runoff  =sat_area*rainthru;
     if (rainthru==0.0) runoff=0.0;      //no runoff and no infiltration
     else if (im==0.0) runoff=rainthru;  //no infiltration; everything runs off
     else if ((io+rainthru)>im)

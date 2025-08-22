@@ -128,12 +128,9 @@ void CmvSoilEvap::GetParticipatingParamList(string  *aP , class_type *aPC , int 
 {
   if (type==SOILEVAP_VIC)
   {
-    nP=5;
-    aP[0]="VIC_ALPHA";      aPC[0]=CLASS_SOIL;
-    aP[1]="VIC_ZMAX";       aPC[1]=CLASS_SOIL;
-    aP[2]="VIC_ZMIN";       aPC[2]=CLASS_SOIL;
-    aP[3]="VIC_EVAP_GAMMA"; aPC[3]=CLASS_SOIL;
-    aP[4]="POROSITY";       aPC[4]=CLASS_SOIL;
+    nP=2;
+    aP[0]="VIC_B_EXP";       aPC[0]=CLASS_SOIL;
+    aP[1]="POROSITY";        aPC[1]=CLASS_SOIL;
   }
   else if (type==SOILEVAP_GAWSER)
   {
@@ -492,23 +489,53 @@ void CmvSoilEvap::GetRatesOfChange (const double      *state_vars,
   }
   //------------------------------------------------------------
   else if (type==SOILEVAP_VIC)
-  {/// from (Woods et al 1992)
-    double alpha,zmax,zmin,gamma2,Smax,Sat;
-    double stor=state_vars[iFrom[0]];
-    double stor_max;
+  {// ARNO Model of Evaporation
+    // Routine to compute evaporation based on the assumption that
+    // evaporation is at the potential for the area which is saturated,
+    // and at some percentage of the potential for the area which is
+    // partially saturated. Saturation based on moisture in the top
+    // soil layer. Intended to be combined with INF_VIC_ARNO.
+    
+    //TODO - should soil evaporation by scaled by impermeable area?
+    
+    int i, num_term;
+    double stor    =state_vars[iFrom[0]]+state_vars[iFrom[1]];
+    double max_stor=pHRU->GetSoilCapacity(0);
+    double b_infilt=pHRU->GetSoilProps(0)->VIC_b_exp; //ARNO/VIC b exponent for runoff [-]
+    double Asat, max_infil;
+    double ratio, tmp, tmpsum, dummy, beta_asp;
 
-    stor_max=pHRU->GetSoilCapacity(0);
-    pSoil   =pHRU->GetSoilProps(0);
-
-    alpha =pSoil->VIC_alpha;
-    zmax  =pSoil->VIC_zmax;
-    zmin  =pSoil->VIC_zmin;
-    gamma2=pSoil->VIC_evap_gamma;
-
-    Smax  =1.0/(alpha+1.0)*(alpha*zmax+zmin);
-    Sat   =stor/stor_max;
-
-    rates[0]=PET*(1.0-pow(1.0-Sat/Smax,gamma2));
+    max_infil = (1.0 + b_infilt) * max_stor;
+    if(b_infilt == -1.0)
+      tmp = max_infil;
+    else {
+      ratio = min(max(1.0-stor/max_stor, 0.0), 1.0);
+      ratio = pow(ratio,(1.0 / (b_infilt + 1.0)));
+      tmp = max_infil*(1.0 - ratio);
+    }
+    
+    if(Options.evaporation==PET_PENMAN_MONTEITH){
+      // TODO - adjust atmospheric resistance to reflect conditions at
+      //        the ground surface (i.e. below the canopy)
+    }
+    
+    if(tmp >= max_infil)
+      rates[0]=PET;
+    else {
+      //  Compute As. 'As' is % area saturated, '1-As' is % area that is unsaturated.
+      Asat = 1.0 - pow(ratio,b_infilt);
+      // Compute the beta function in the ARNO evaporation model using
+      // the first 30 terms in the power expansion expression.
+      dummy = 1.0;
+      for(num_term=1;num_term<=30;num_term++) {
+        tmpsum = ratio;
+        for ( i = 1; i < num_term; i++ ) tmpsum *= ratio;
+        dummy += b_infilt * tmpsum / (b_infilt + num_term);
+      }
+      beta_asp = Asat+(1.0-Asat)*(1.0-ratio)*dummy;
+      rates[0]=PET*beta_asp;
+    }
+    
     PETused=rates[0];
   }
   //------------------------------------------------------------------
