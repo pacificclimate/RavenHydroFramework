@@ -62,7 +62,7 @@ inline double CalculateLeafConductance( const double       &max_leaf_cond,     /
     else                           {f3 = 0.0;}*/
 
   //leaf water content
-  f4=1.0-0.00119*exp(8.1*soil_moist_deficit);   //needs to be fixed, doesn't work properly
+  //f4=1.0-0.00119*exp(8.1*soil_moist_deficit);   //needs to be fixed, doesn't work properly
   f4=1.0;
 
   //cout<<"f1-f4: "<<f1<<" "<<f2<<" "<<f3<<" "<<f4<<endl;

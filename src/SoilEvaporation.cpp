@@ -76,7 +76,7 @@ CmvSoilEvap::CmvSoilEvap(soilevap_type se_type,
           (type==SOILEVAP_FEDERER))
   {
     CHydroProcessABC::DynamicSpecifyConnections(nSoilLayers+1);
-    ExitGracefully("CmvSoilEvap::Constructor:SOILEVAP_FEDERER",STUB);
+    //ExitGracefully("CmvSoilEvap::Constructor:SOILEVAP_FEDERER",STUB);
     for(int m=0;m<nSoilLayers;m++) {
       iFrom[m]=pModel->GetStateVarIndex(SOIL,m);     iTo[m]=iAtmos;
     }
@@ -145,7 +145,7 @@ void CmvSoilEvap::GetParticipatingParamList(string  *aP , class_type *aPC , int 
   {
     nP=2;
     aP[0]="POROSITY";       aPC[0]=CLASS_SOIL;
-    aP[1]="REL_ROOTDEN";    aPC[1]=CLASS_VEGETATION;
+    aP[1]="ROOT_EXTINCT";   aPC[1]=CLASS_VEGETATION;
   }
   else if ((type==SOILEVAP_TOPMODEL) || (type==SOILEVAP_SEQUEN) || (type==SOILEVAP_ROOT) || (type == SOILEVAP_ROOT_CONSTRAIN))
   {
@@ -341,25 +341,70 @@ void CmvSoilEvap::GetRatesOfChange (const double      *state_vars,
 
   //------------------------------------------------------------
   if (type==SOILEVAP_ROOTFRAC)
-  {
-    ///  from Desborough, 1997 \cite Desborough1997MWR
-    double      root_frac[MAX_SOILLAYERS];
-    double      cap      [MAX_SOILLAYERS];
-    int         m,q;
+  { //  VIC model of multi-layer vegetation transpiration
+    int m,q;
+    double depth    [nSoilLayers];
+    double root_frac[nSoilLayers];
+    double cap      [nSoilLayers];
+    double zrel     [nSoilLayers];
+    double max_depth=0.0;
+    double stor,wilt,field;
+    double f4;
+    double atmos_cond,canop_cond,cond;
 
-    double      rootsum=0.0;
+    double beta=pHRU->GetVegetationProps()->root_extinct;
+    double Fcan=pHRU->GetSurfaceProps()->forest_coverage;
+    double leaf_cond=pHRU->GetVegVarProps()->leaf_cond;
+    double shfact=pHRU->GetVegVarProps()->shelter_factor;
+    double lai=pHRU->GetVegVarProps()->LAI;
 
+    //Atmospheric conductance
+    double zero_pl =pHRU->GetVegVarProps()->zero_pln_disp;
+    double rough   =pHRU->GetVegVarProps()->roughness;
+    double ref_ht  =pHRU->GetVegVarProps()->reference_height;
+    //if(wind_measurement_ht>ref_ht){ref_ht=wind_measurement_ht;} //correction if real measurement height data is available
+    double vap_rough_ht=0.1*rough;
+    atmos_cond=CalcAtmosphericConductance(pHRU->GetForcingFunctions()->wind_vel,ref_ht,zero_pl,rough,vap_rough_ht);
+
+    // Get total soil depth and depth of each soil layer
     for (m=0;m<nSoilLayers;m++)
     {
-      cap      [m]=pHRU->GetSoilCapacity(pModel->GetStateVarIndex(SOIL,m));
-      root_frac[m]=pHRU->GetVegVarProps()->rel_rootden;
-
-      rootsum+=root_frac[m];
+      cap[m]=pHRU->GetSoilCapacity(pModel->GetStateVarIndex(SOIL,m));
+      max_depth+=pHRU->GetSoilThickness(pModel->GetStateVarIndex(SOIL,m)); //[mm]
+      depth[m]=max_depth;                 //[mm]
     }
+    
+    // Calculate root fraction for current layer
+    // Normalized root length densities calculated as per
+    // Ojha, C. S. P., Rai, A. K. (1996): Nonlinear root water uptake model.
+    // Journal of Irrigation and Drainage Engineering 122: 198-201.
+    for (m=0;m<nSoilLayers;m++)
+    {
+      zrel[m]=depth[m]/max_depth;
+      if(m==0){
+        root_frac[m]=1-pow(1.0-zrel[m],beta);
+      }
+      else {
+        root_frac[m]=pow(1.0-zrel[m-1],beta)-pow(1.0-zrel[m],beta);
+      }
+    }
+  
+    // Transpiration from each soil layer
     for (q=0;q<_nConnections-1;q++)
     {
       m=q;
-      rates[q]=PET*(root_frac[m]/rootsum)*threshMin(1.0,state_vars[iFrom[q]]/cap[m],0.0);
+      field=pHRU->GetSoilProps(m)->field_capacity;     //[0..1]
+      wilt=pHRU->GetSoilProps(m)->sat_wilt;            //[0..1]
+      stor=state_vars[iFrom[q]]/cap[m];                //[0..1]
+      
+      // Update canopy conductance for soil moisture conditions in each layer
+      f4=max(0.0,min((stor-wilt)/(field-wilt),1.0));
+      canop_cond=f4*leaf_cond*shfact*lai;
+      cond=atmos_cond/(atmos_cond+canop_cond);
+
+      rates[q]=Fcan*root_frac[m]*PET*cond;
+      //Check that evapotransipration does not cause soil moisture to fall below wilting point
+      if (stor*cap[m]-rates[q] < wilt*cap[m]) {rates[q]=(stor-wilt)*cap[m];}
       PETused+=rates[q];
     }
   }

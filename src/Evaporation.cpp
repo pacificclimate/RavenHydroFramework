@@ -68,7 +68,7 @@ double TurcEvap(const force_struct *F)
 }
 
 //////////////////////////////////////////////////////////////////
-/// \brief Returns evaporation rate [mm/d]
+/// \brief Returns free water evaporation rate [mm/d]
 /// \details Returns evaporation rate using the Penman-Monteith equation, which
 /// is an energy-balance approach
 /// \ref  Adapted from Dingman, Howell, T.A and Evett, S.R. (USDA-Agricultural research service) \cite Howell2004 \cite Dingman2004
@@ -77,12 +77,10 @@ double TurcEvap(const force_struct *F)
 ///
 /// \param *F [in] Forcing functions for a specific HRU over the current time step
 /// \param &atmos_cond [in] Atmospheric conductance [mm/s]
-/// \param &canopy_cond [in] Canopy conductance [mm/s]
 /// \return Evaporation rate [mm/d]
 //
 double PenmanMonteithEvap(const force_struct     *F,
-                          const double       &atmos_cond,   //[mm/s]
-                          const double       &canopy_cond)  //[mm/s]
+                          const double       &atmos_cond)  //[mm/s]
 {
   double numer, denom;
   double gamma;     //psychometric "constant" [kPa/K]
@@ -97,11 +95,10 @@ double PenmanMonteithEvap(const force_struct     *F,
   gamma    =GetPsychrometricConstant (F->air_pres,LH_vapor);
   vapor_def=sat_vap*(1.0-F->rel_humidity);
 
-  //Calculate evaporation - Dingman eqn 7-56
+  //Calculate free water evaporation - Dingman eqn 6.36
   numer =de_dT*max(F->SW_radia_net + F->LW_radia_net,0.0); //[kPa/K*MJ/m2/d]
   numer+=(F->air_dens)*SPH_AIR*vapor_def*(atmos_cond*SEC_PER_DAY/MM_PER_METER);//[kPa/K*MJ/m2/d]
-  denom = (de_dT+gamma*(1.0+(atmos_cond/canopy_cond)))*LH_vapor*DENSITY_WATER; //[kPa/K*MJ/m3]
-  if (canopy_cond==0){return 0.0;}//zero conductance means no ET
+  denom = (de_dT+gamma)*LH_vapor*DENSITY_WATER; //[kPa/K*MJ/m3]
 
   return numer/denom*MM_PER_METER;//[mm/d]
 }
@@ -378,12 +375,12 @@ double CModel::EstimatePET(const force_struct &F,
   //-------------------------------------------------------------------------------------
   case(PET_PENMAN_MONTEITH):
   {
-    double can_cond;
+    //double can_cond;
     double zero_pl,rough;
     double vap_rough_ht,atmos_cond;
     double ref_ht;
 
-    can_cond=pHRU->GetVegVarProps()->canopy_conductance;
+    //can_cond=pHRU->GetVegVarProps()->canopy_conductance;
     zero_pl =pHRU->GetVegVarProps()->zero_pln_disp;
     rough   =pHRU->GetVegVarProps()->roughness;
     ref_ht  =pHRU->GetVegVarProps()->reference_height; //default veght+2.0 m
@@ -394,7 +391,7 @@ double CModel::EstimatePET(const force_struct &F,
 
     atmos_cond=CalcAtmosphericConductance(F.wind_vel,ref_ht,zero_pl,rough,vap_rough_ht);
 
-    PET=PenmanMonteithEvap(&F,atmos_cond,can_cond); break;
+    PET=PenmanMonteithEvap(&F,atmos_cond); break;
   }
   //-------------------------------------------------------------------------------------
   case(PET_PENMAN_COMBINATION):

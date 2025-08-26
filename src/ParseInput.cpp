@@ -2364,6 +2364,7 @@ bool ParseMainInputFile (CModel     *&pModel,
       else if (!strcmp(s[1],"SOILEVAP_SEQUEN"       )){se_type=SOILEVAP_SEQUEN;}
       else if (!strcmp(s[1],"SOILEVAP_ROOT"         )){se_type=SOILEVAP_ROOT;}
       else if (!strcmp(s[1],"SOILEVAP_ROOT_CONSTRAIN")){se_type=SOILEVAP_ROOT_CONSTRAIN;}
+      else if (!strcmp(s[1],"SOILEVAP_ROOTFRAC"     )){se_type=SOILEVAP_ROOTFRAC;}
       else if (!strcmp(s[1],"SOILEVAP_HBV"          )){se_type=SOILEVAP_HBV;}
       else if (!strcmp(s[1],"SOILEVAP_HYPR"         )){se_type=SOILEVAP_HYPR;}
       else if (!strcmp(s[1],"SOILEVAP_UBC"          )){se_type=SOILEVAP_UBC;}
