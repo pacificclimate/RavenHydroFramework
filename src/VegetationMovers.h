@@ -21,7 +21,8 @@ enum canevap_type
 {
   CANEVP_RUTTER,                      ///< rutter conceptual model
   CANEVP_MAXIMUM,                     ///< evaporates at PET rate
-  CANEVP_ALL                            ///< HBV model
+  CANEVP_ALL,                         ///< HBV model
+  CANEVP_VIC                          ///< VIC model
 };
 
 ////////////////////////////////////////////////////////////////////

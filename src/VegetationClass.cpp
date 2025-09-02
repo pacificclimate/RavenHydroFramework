@@ -312,7 +312,7 @@ void CVegetationClass::InitializeVegetationProps(string name, veg_struct &V, boo
   }
 
   //User-specified parameters
-  V.drip_proportion   =DefaultParameterValue(is_template,false);//0.2;//[1/day]
+  V.drip_proportion   =DefaultParameterValue(is_template,false);//0.2; //[1/day]
   V.max_intercept_rate=DefaultParameterValue(is_template,false);//10.0;//[mm/day]
   V.CHU_maturity      =DefaultParameterValue(is_template,false);//2800;
   V.max_root_length   =DefaultParameterValue(is_template,false);//200;  //[mm/m2]

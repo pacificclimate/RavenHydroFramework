@@ -50,7 +50,11 @@ inline double CalculateLeafConductance( const double       &max_leaf_cond,     /
   //f2 = 1.0 / (1.0 + VPD / CVPD);//VPD - vapor deficit
 
   //leaf temperature
-  f3=(F->temp_ave)*pow(max(40.0-(F->temp_ave),0.0),1.18)/691.0;
+  f3=0.0;
+  if((F->temp_ave > 0.0) && (F->temp_ave < 40.0))
+  {
+    f3=(F->temp_ave)*pow(max(40.0-(F->temp_ave),0.0),1.18)/691.0;
+  }
 
   ///< \ref temperature limitation (Brook90) \cite Federer2010
   /*double Ta=F->temp_daily;
@@ -64,9 +68,6 @@ inline double CalculateLeafConductance( const double       &max_leaf_cond,     /
   //leaf water content
   //f4=1.0-0.00119*exp(8.1*soil_moist_deficit);   //needs to be fixed, doesn't work properly
   f4=1.0;
-
-  //cout<<"f1-f4: "<<f1<<" "<<f2<<" "<<f3<<" "<<f4<<endl;
-  //cout<<"soil water: "<<soil_moist_deficit<<" "<<max_leaf_cond<<" "<< min_leaf_cond<<endl;
 
   return min(max(f1*f2*f3*f4,0.0),1.0)*(max_leaf_cond-min_leaf_cond)+min_leaf_cond;
 
@@ -88,7 +89,7 @@ void CVegetationClass::RecalculateCanopyParams (      veg_var_struct    &VV,
                                                       const time_struct      &tt,
                                                       const optStruct        &Options)
 {
-  VV.shelter_factor=0.5;// should be variable
+  VV.shelter_factor=1.0;// should be variable
 
   double max_height  =pHRU->GetVegetationProps()->max_height;
   double sparseness  =pHRU->GetSurfaceProps()->forest_sparseness;

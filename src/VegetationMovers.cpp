@@ -74,6 +74,12 @@ void CmvCanopyEvap::GetParticipatingParamList(string  *aP , class_type *aPC , in
   {
     nP=0;
   }
+  else if (type==CANEVP_VIC)
+  {
+    nP=2;
+    aP[0]="FOREST_COVERAGE"; aPC[0]=CLASS_LANDUSE;
+    aP[1]="MAX_CAPACITY";    aPC[1]=CLASS_VEGETATION;
+  }
   else
   {
     ExitGracefully("CmvCanopyEvap::GetParticipatingParamList: undefined canopy evaporation algorithm",BAD_DATA);
@@ -147,6 +153,29 @@ void CmvCanopyEvap::GetRatesOfChange( const double      *state_vars,
   {
     //all canopy mass evaporates 'instantaneously'
     rates[0]=state_vars[iFrom[0]]/Options.timestep;
+    PETused=rates[0];
+  }
+  else if (type==CANEVP_VIC)//-----------------------------------
+  {
+    
+    double zero_pl  =pHRU->GetVegVarProps()->zero_pln_disp;
+    double rough    =pHRU->GetVegVarProps()->roughness;
+    double ref_ht   =pHRU->GetVegVarProps()->reference_height; //default veght+2.0 m
+    double wind_vel =pHRU->GetForcingFunctions()->wind_vel;
+    double vap_rough_ht,ra,rac,ufric,beta_inv;
+
+    //if(wind_measurement_ht>ref_ht){ref_ht=wind_measurement_ht;} //correction if real measurement height data is available
+
+    vap_rough_ht=0.1*rough;//=1.0*rough for dingman
+    
+    ra=1/CalcAtmosphericConductance(wind_vel,ref_ht,zero_pl,rough,vap_rough_ht);
+    
+    // Adjust for air resistances opposed to heat and water vapour transfer within the canopy
+    ufric = wind_vel*VON_KARMAN/log((ref_ht-zero_pl)/rough)*MM_PER_METER;
+    beta_inv = log(rough/vap_rough_ht)/VON_KARMAN;
+    rac=beta_inv/ufric;
+
+    rates[0]=Fc*pow(stor/(cap*Fc), 2.0/3.0)*PET*(ra/(ra+rac));
     PETused=rates[0];
   }
   else//---------------------------------------------------------

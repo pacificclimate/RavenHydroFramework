@@ -2215,6 +2215,7 @@ bool ParseMainInputFile (CModel     *&pModel,
       if      (!strcmp(s[1],"CANEVP_RUTTER"  )){ce_type=CANEVP_RUTTER;}
       else if (!strcmp(s[1],"CANEVP_MAXIMUM" )){ce_type=CANEVP_MAXIMUM;}
       else if (!strcmp(s[1],"CANEVP_ALL"     )){ce_type=CANEVP_ALL;}
+      else if (!strcmp(s[1],"CANEVP_VIC"     )){ce_type=CANEVP_VIC;}
       else
       {
         ExitGracefully("ParseMainInputFile: Unrecognized canopy evaporation process representation",BAD_DATA_WARN); break;

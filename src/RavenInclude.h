@@ -229,7 +229,7 @@ const double  CZS_HEIGHT              =1.0;                                     
 const double  CZR                     =0.05;                                    ///< [0..1]  ratio of roughness to height for rough closed canopies
 const double  CZR_HEIGHT              =10.0;                                    ///< [m]     height above which czr applies
 const double  CLOSED_LAI              =4.0;                                     ///< [m2/m2] minimum LAI defining a closed canopy (Shuttleworth and Wallace (1985))
-const double  Z_REF_ADJUST            =2.0;                                     ///< [m]     reference height for weather data above canopy height
+const double  Z_REF_ADJUST            =10.0;                                    ///< [m]     reference height for weather data above canopy height
 const double  WIND_EXTINCT            =2.5;                                     ///< [-]     wind/diffusivity extinction coefficient
 
 /// \note This is always 2 for broadleaves, and ranges from 2 for flat needles to pi for cylindrical needles.

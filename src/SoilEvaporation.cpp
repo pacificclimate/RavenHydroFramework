@@ -75,8 +75,11 @@ CmvSoilEvap::CmvSoilEvap(soilevap_type se_type,
   else if((type==SOILEVAP_ROOTFRAC) ||
           (type==SOILEVAP_FEDERER))
   {
+    int nSoilLayers=pModel->GetNumSoilLayers();
     CHydroProcessABC::DynamicSpecifyConnections(nSoilLayers+1);
-    //ExitGracefully("CmvSoilEvap::Constructor:SOILEVAP_FEDERER",STUB);
+    ExitGracefullyIf(type==SOILEVAP_FEDERER, "CmvSoilEvap::Constructor:SOILEVAP_FEDERER",STUB);
+    ExitGracefullyIf(pModel->GetNumSoilLayers()!=3,
+      "CmvSoilEvap::Constructor:SOILEVAP_ROOTFRAC requires 3 soil layers to operate. Please use a different :SoilModel or replace this evaporation algorithm.",BAD_DATA);
     for(int m=0;m<nSoilLayers;m++) {
       iFrom[m]=pModel->GetStateVarIndex(SOIL,m);     iTo[m]=iAtmos;
     }
@@ -128,9 +131,10 @@ void CmvSoilEvap::GetParticipatingParamList(string  *aP , class_type *aPC , int 
 {
   if (type==SOILEVAP_VIC)
   {
-    nP=2;
+    nP=3;
     aP[0]="VIC_B_EXP";       aPC[0]=CLASS_SOIL;
     aP[1]="POROSITY";        aPC[1]=CLASS_SOIL;
+    aP[2]="FOREST_COVERAGE"; aPC[2]=CLASS_LANDUSE;
   }
   else if (type==SOILEVAP_GAWSER)
   {
@@ -143,9 +147,13 @@ void CmvSoilEvap::GetParticipatingParamList(string  *aP , class_type *aPC , int 
   }
   else if (type==SOILEVAP_ROOTFRAC)
   {
-    nP=2;
-    aP[0]="POROSITY";       aPC[0]=CLASS_SOIL;
-    aP[1]="ROOT_EXTINCT";   aPC[1]=CLASS_VEGETATION;
+    nP=6;
+    aP[0]="POROSITY";         aPC[0]=CLASS_SOIL;
+    aP[1]="FIELD_CAPACITY";   aPC[1]=CLASS_SOIL;
+    aP[2]="SAT_WILT";         aPC[2]=CLASS_SOIL;
+    aP[3]="ROOT_EXTINCT";     aPC[3]=CLASS_VEGETATION;
+    aP[4]="MAX_LEAF_COND";    aPC[4]=CLASS_VEGETATION;
+    aP[5]="FOREST_COVERAGE";  aPC[5]=CLASS_LANDUSE;
   }
   else if ((type==SOILEVAP_TOPMODEL) || (type==SOILEVAP_SEQUEN) || (type==SOILEVAP_ROOT) || (type == SOILEVAP_ROOT_CONSTRAIN))
   {
@@ -280,7 +288,12 @@ void CmvSoilEvap::GetParticipatingStateVarList(soilevap_type se_type,sv_type *aS
   }
   else if ((se_type==SOILEVAP_ROOTFRAC) || (se_type==SOILEVAP_FEDERER))
   {
-    nSV=0; //multilayer/user-specified
+    //nSV=0; //multilayer/user-specified
+    nSV=4;
+    aSV[0]=SOIL;       aLev[0]=0;
+    aSV[1]=SOIL;       aLev[1]=1;
+    aSV[2]=SOIL;       aLev[2]=2;
+    aSV[3]=ATMOSPHERE; aLev[3]=DOESNT_EXIST;
   }
   else if (se_type==SOILEVAP_GR4J)
   {
@@ -343,42 +356,63 @@ void CmvSoilEvap::GetRatesOfChange (const double      *state_vars,
   if (type==SOILEVAP_ROOTFRAC)
   { //  VIC model of multi-layer vegetation transpiration
     int m,q;
-    double depth    [nSoilLayers];
-    double root_frac[nSoilLayers];
-    double cap      [nSoilLayers];
-    double zrel     [nSoilLayers];
+    int    nSoilLayers=3;
+    double depth      [nSoilLayers];
+    double root_frac  [nSoilLayers];
+    double cap        [nSoilLayers];
+    double zrel       [nSoilLayers];
+    double avail_moist[nSoilLayers];
+    double sat_wilt   [nSoilLayers];
+    double field      [nSoilLayers];
     double max_depth=0.0;
-    double stor,wilt,field;
+    double moist1, moist2;                // tmp holding of moisture
+    double field1;                        // tmp holding of critical water for upper layers
     double f4;
-    double atmos_cond,canop_cond,cond;
+    double ra,rc,rr;
+    double root_sum;
+    double evap, spare_evap;
 
-    double beta=pHRU->GetVegetationProps()->root_extinct;
-    double Fcan=pHRU->GetSurfaceProps()->forest_coverage;
-    double leaf_cond=pHRU->GetVegVarProps()->leaf_cond;
-    double shfact=pHRU->GetVegVarProps()->shelter_factor;
-    double lai=pHRU->GetVegVarProps()->LAI;
+    double sat_vap   =GetSaturatedVaporPressure(pHRU->GetForcingFunctions()->temp_ave);
+    double de_dT     =GetSatVapSlope           (pHRU->GetForcingFunctions()->temp_ave,sat_vap);
+    double LH_vapor  =GetLatentHeatVaporization(pHRU->GetForcingFunctions()->temp_ave);
+    double gamma     =GetPsychrometricConstant (pHRU->GetForcingFunctions()->air_pres,LH_vapor);
+    
+    //Vegetation properties
+    double beta      =pHRU->GetVegetationProps()->root_extinct;
+    double Fcan      =pHRU->GetSurfaceProps()->forest_coverage;
+    double canop_cond=pHRU->GetVegVarProps()->canopy_conductance;
+    double shfact    =pHRU->GetVegVarProps()->shelter_factor;
+    double lai       =pHRU->GetVegVarProps()->LAI;
+    double canop_cap =Fcan*pHRU->GetVegVarProps()->capacity;
+    
+    double canop_stor=min(max(state_vars[pModel->GetStateVarIndex(CANOPY)],0.0),canop_cap); //correct for potentially invalid storage
+    double alpha=pow(canop_stor/canop_cap, 2.0/3.0);
 
-    //Atmospheric conductance
+    //Atmospheric resistance
     double zero_pl =pHRU->GetVegVarProps()->zero_pln_disp;
     double rough   =pHRU->GetVegVarProps()->roughness;
     double ref_ht  =pHRU->GetVegVarProps()->reference_height;
     //if(wind_measurement_ht>ref_ht){ref_ht=wind_measurement_ht;} //correction if real measurement height data is available
     double vap_rough_ht=0.1*rough;
-    atmos_cond=CalcAtmosphericConductance(pHRU->GetForcingFunctions()->wind_vel,ref_ht,zero_pl,rough,vap_rough_ht);
+    ra=1.0/CalcAtmosphericConductance(pHRU->GetForcingFunctions()->wind_vel,ref_ht,zero_pl,rough,vap_rough_ht);
 
-    // Get total soil depth and depth of each soil layer
+    // Get soil parameters for each soil layer
     for (m=0;m<nSoilLayers;m++)
     {
-      cap[m]=pHRU->GetSoilCapacity(pModel->GetStateVarIndex(SOIL,m));
-      max_depth+=pHRU->GetSoilThickness(pModel->GetStateVarIndex(SOIL,m)); //[mm]
-      depth[m]=max_depth;                 //[mm]
+      cap[m]     =pHRU->GetSoilCapacity(m);              //[mm]
+      sat_wilt[m]=pHRU->GetSoilProps(m)->sat_wilt;       //[0..1]
+      field[m]   =pHRU->GetSoilProps(m)->field_capacity; //[0..1]
+      max_depth +=pHRU->GetSoilThickness(m);             //[mm]
+      depth[m]   =max_depth;                             //[mm]
     }
     
-    // Calculate root fraction for current layer
+    // Compute root fractions and moisture content in combined upper layers.
     // Normalized root length densities calculated as per
     // Ojha, C. S. P., Rai, A. K. (1996): Nonlinear root water uptake model.
     // Journal of Irrigation and Drainage Engineering 122: 198-201.
-    for (m=0;m<nSoilLayers;m++)
+    moist1=0.0;
+    field1=0.0; 
+    for (m=0;m<nSoilLayers-1;m++)
     {
       zrel[m]=depth[m]/max_depth;
       if(m==0){
@@ -387,26 +421,106 @@ void CmvSoilEvap::GetRatesOfChange (const double      *state_vars,
       else {
         root_frac[m]=pow(1.0-zrel[m-1],beta)-pow(1.0-zrel[m],beta);
       }
+      if(root_frac[m] > 0.0) {
+        avail_moist[m]=state_vars[iFrom[m]]/cap[m];
+        moist1+=avail_moist[m];
+        field1+=field[m];
+      }
+      else avail_moist[m]=0.0;
     }
-  
-    // Transpiration from each soil layer
-    for (q=0;q<_nConnections-1;q++)
-    {
-      m=q;
-      field=pHRU->GetSoilProps(m)->field_capacity;     //[0..1]
-      wilt=pHRU->GetSoilProps(m)->sat_wilt;            //[0..1]
-      stor=state_vars[iFrom[q]]/cap[m];                //[0..1]
-      
-      // Update canopy conductance for soil moisture conditions in each layer
-      f4=max(0.0,min((stor-wilt)/(field-wilt),1.0));
-      canop_cond=f4*leaf_cond*shfact*lai;
-      cond=atmos_cond/(atmos_cond+canop_cond);
+    
+    //Compute root fraction and moisture content in lowest layer
+    m=nSoilLayers-1;
+    moist2=state_vars[iFrom[m]]/cap[m];
+    avail_moist[m]=moist2;
+    zrel[m]=depth[m]/max_depth;
+    root_frac[m]=pow(1.0-zrel[m-1],beta)-pow(1.0-zrel[m],beta);
+    
+    /** Calculate transpiration from each soil layer **/
 
-      rates[q]=Fcan*root_frac[m]*PET*cond;
+    /******************************************************************
+    CASE 1: Moisture in both layers exceeds field capacity, or moisture
+    in layer with more than half of the roots exceeds field capacity.
+
+    Potential evapotranspiration not hindered by soil dryness.  If
+    layer with less than half the roots is dryer than field capacity,
+    extra evaporation is taken from the wetter layer. Otherwise layers
+    contribute to evapotransipration based on root fraction.
+    ******************************************************************/
+    
+    if((moist1>=field1 && moist2>=field[nSoilLayers-1] && field1>0.0) ||
+       (moist1>=field1 && (1-root_frac[nSoilLayers-1])>= 0.5) ||
+       (moist2>=field[nSoilLayers-1] && root_frac[nSoilLayers-1]>=0.5)) {
+      
+      f4=1.0;
+      rc=1.0/canop_cond;                        //[s/mm];
+      //Scaling factor for PET based on updated canopy resistance
+      rr=(de_dT+gamma)/(de_dT+gamma*(1+rc/ra));
+      //rr=ra/(ra+rc);
+      evap=Fcan*(1.0-alpha)*PET*rr;             //[mm/d]
+      
+      // divide up evaporation based on root distribution
+      root_sum=1.0;
+      spare_evap=0.0;
+      for(q=0;q<_nConnections-1;q++) {
+        m=q;
+        if(avail_moist[m]>=field[m]) {
+          rates[q]=evap*root_frac[m];
+        }
+        else {
+          f4=max(0.0,min((avail_moist[m]-sat_wilt[m])/(field[m]-sat_wilt[m]),1.0));
+          rates[q]  =evap*f4*root_frac[m];
+          root_sum -=root_frac[m];
+          spare_evap=evap*root_frac[m]*(1.0-f4);
+        }
+        
+      }
+      
+      // Assign excess evaporation to wetter layer 
+      if(spare_evap>0.0){
+        for(q=0;q<_nConnections-1;q++) {
+          m=q;
+          if(avail_moist[m]>=field[m]){
+            rates[q]+=root_frac[m]*spare_evap/root_sum;
+          }
+        }
+      }
+      
       //Check that evapotransipration does not cause soil moisture to fall below wilting point
-      if (stor*cap[m]-rates[q] < wilt*cap[m]) {rates[q]=(stor-wilt)*cap[m];}
-      PETused+=rates[q];
+      for(q=0;q<_nConnections-1;q++) {
+        m=q;
+        rates[q]=max(min(rates[q],(avail_moist[m]-sat_wilt[m])*cap[m]/Options.timestep),0.0);
+        PETused+=rates[q];
+      }
     }
+    
+    /*********************************************************************
+    CASE 2: Independent evapotranspirations
+
+    Evapotranspiration is restricted by low soil moisture. Evaporation
+    is computed independantly from each soil layer.
+    *********************************************************************/
+
+    else {
+
+      for(q=0;q<_nConnections-1;q++){
+        m=q;
+        f4=max(0.0,min((avail_moist[m]-sat_wilt[m])/(field[m]-sat_wilt[m]),1.0));
+
+        if(f4 > 0.0){
+          rc=1.0/(f4*canop_cond);         //[s/mm];
+          rr=(de_dT+gamma)/(de_dT+gamma*(1+rc/ra));
+          //rr=ra/(ra+rc);
+          rates[q] = Fcan*(1.0-alpha)*root_frac[m]*PET*rr; //TODO: does root_frac make sense here?
+        }
+        else rates[q] = 0.0;
+        
+        //Check that evapotransipration does not cause soil moisture to fall below wilting point
+        rates[q]=max(min(rates[q],(avail_moist[m]-sat_wilt[m])*cap[m]/Options.timestep),0.0);
+        PETused+=rates[q];
+      }
+    }
+     
   }
   //------------------------------------------------------------
   else if (type==SOILEVAP_LINEAR) //linear function of saturation
@@ -535,11 +649,11 @@ void CmvSoilEvap::GetRatesOfChange (const double      *state_vars,
   //------------------------------------------------------------
   else if (type==SOILEVAP_VIC)
   {// ARNO Model of Evaporation
-    // Routine to compute evaporation based on the assumption that
-    // evaporation is at the potential for the area which is saturated,
-    // and at some percentage of the potential for the area which is
-    // partially saturated. Saturation based on moisture in the top
-    // soil layer. Intended to be combined with INF_VIC_ARNO.
+    // Routine to compute evaporation from top soil layer based on the
+    // assumption that evaporation is at the potential for the area which
+    // is saturated, and at some percentage of the potential for the area
+    // which is partially saturated. Intended to be combined with INF_VIC_ARNO.
+    // Soil evaporation only occurs in areas a bare soil.
     
     //TODO - should soil evaporation by scaled by impermeable area?
     
@@ -547,6 +661,7 @@ void CmvSoilEvap::GetRatesOfChange (const double      *state_vars,
     double stor    =state_vars[iFrom[0]]+state_vars[iFrom[1]];
     double max_stor=pHRU->GetSoilCapacity(0);
     double b_infilt=pHRU->GetSoilProps(0)->VIC_b_exp; //ARNO/VIC b exponent for runoff [-]
+    double Fcan    =pHRU->GetSurfaceProps()->forest_coverage;
     double Asat, max_infil;
     double ratio, tmp, tmpsum, dummy, beta_asp;
 
@@ -561,11 +676,11 @@ void CmvSoilEvap::GetRatesOfChange (const double      *state_vars,
     
     if(Options.evaporation==PET_PENMAN_MONTEITH){
       // TODO - adjust atmospheric resistance to reflect conditions at
-      //        the ground surface (i.e. below the canopy)
+      //        the ground surface
     }
     
     if(tmp >= max_infil)
-      rates[0]=PET;
+      rates[0]=(1.0-Fcan)*PET;
     else {
       //  Compute As. 'As' is % area saturated, '1-As' is % area that is unsaturated.
       Asat = 1.0 - pow(ratio,b_infilt);
@@ -578,7 +693,7 @@ void CmvSoilEvap::GetRatesOfChange (const double      *state_vars,
         dummy += b_infilt * tmpsum / (b_infilt + num_term);
       }
       beta_asp = Asat+(1.0-Asat)*(1.0-ratio)*dummy;
-      rates[0]=PET*beta_asp;
+      rates[0]=(1.0-Fcan)*PET*beta_asp;
     }
     
     PETused=rates[0];
