@@ -342,8 +342,11 @@ void CmvSoilEvap::GetRatesOfChange (const double      *state_vars,
   if (pHRU->GetHRUType()!=HRU_STANDARD){return;}//Lake/Glacier case
 
   double PET,PETused(0.0);
+  double ref_ht,zero_pl,rough,vap_rough_ht,wind;
+  double atm_res,Fcan;
+  double soil_rough=0.01; //TODO: Set as global parameter
   const soil_struct *pSoil;
-
+  
   PET=pHRU->GetForcingFunctions()->PET;
 
   if (!Options.suppressCompetitiveET){
@@ -351,6 +354,15 @@ void CmvSoilEvap::GetRatesOfChange (const double      *state_vars,
     PET-=(state_vars[pModel->GetStateVarIndex(AET)]/Options.timestep);
     PET=max(PET,0.0);
   }
+  
+  Fcan   =pHRU->GetSurfaceProps()->forest_coverage;
+  ref_ht =pHRU->GetVegVarProps()->reference_height;
+  zero_pl=pHRU->GetVegVarProps()->zero_pln_disp;
+  rough  =pHRU->GetVegVarProps()->roughness;
+  vap_rough_ht=0.1*rough;
+  wind   =pHRU->GetForcingFunctions()->wind_vel;
+  atm_res=1.0/CalcAtmosphericConductance(wind,ref_ht,zero_pl,rough,vap_rough_ht);
+  
 
   //------------------------------------------------------------
   if (type==SOILEVAP_ROOTFRAC)
@@ -368,7 +380,7 @@ void CmvSoilEvap::GetRatesOfChange (const double      *state_vars,
     double moist1, moist2;                // tmp holding of moisture
     double field1;                        // tmp holding of critical water for upper layers
     double f4;
-    double ra,rc,rr;
+    double canop_res,rr;
     double root_sum;
     double evap, spare_evap;
 
@@ -379,22 +391,10 @@ void CmvSoilEvap::GetRatesOfChange (const double      *state_vars,
     
     //Vegetation properties
     double beta      =pHRU->GetVegetationProps()->root_extinct;
-    double Fcan      =pHRU->GetSurfaceProps()->forest_coverage;
     double canop_cond=pHRU->GetVegVarProps()->canopy_conductance;
-    double shfact    =pHRU->GetVegVarProps()->shelter_factor;
-    double lai       =pHRU->GetVegVarProps()->LAI;
     double canop_cap =Fcan*pHRU->GetVegVarProps()->capacity;
-    
     double canop_stor=min(max(state_vars[pModel->GetStateVarIndex(CANOPY)],0.0),canop_cap); //correct for potentially invalid storage
     double alpha=pow(canop_stor/canop_cap, 2.0/3.0);
-
-    //Atmospheric resistance
-    double zero_pl =pHRU->GetVegVarProps()->zero_pln_disp;
-    double rough   =pHRU->GetVegVarProps()->roughness;
-    double ref_ht  =pHRU->GetVegVarProps()->reference_height;
-    //if(wind_measurement_ht>ref_ht){ref_ht=wind_measurement_ht;} //correction if real measurement height data is available
-    double vap_rough_ht=0.1*rough;
-    ra=1.0/CalcAtmosphericConductance(pHRU->GetForcingFunctions()->wind_vel,ref_ht,zero_pl,rough,vap_rough_ht);
 
     // Get soil parameters for each soil layer
     for (m=0;m<nSoilLayers;m++)
@@ -410,6 +410,7 @@ void CmvSoilEvap::GetRatesOfChange (const double      *state_vars,
     // Normalized root length densities calculated as per
     // Ojha, C. S. P., Rai, A. K. (1996): Nonlinear root water uptake model.
     // Journal of Irrigation and Drainage Engineering 122: 198-201.
+    // TODO: incorporate root fraction calculation into CVegetationClass::RecalculateRootParams
     moist1=0.0;
     field1=0.0; 
     for (m=0;m<nSoilLayers-1;m++)
@@ -453,10 +454,9 @@ void CmvSoilEvap::GetRatesOfChange (const double      *state_vars,
        (moist2>=field[nSoilLayers-1] && root_frac[nSoilLayers-1]>=0.5)) {
       
       f4=1.0;
-      rc=1.0/canop_cond;                        //[s/mm];
+      canop_res=1.0/canop_cond;                        //[s/mm];
       //Scaling factor for PET based on updated canopy resistance
-      rr=(de_dT+gamma)/(de_dT+gamma*(1+rc/ra));
-      //rr=ra/(ra+rc);
+      rr=(de_dT+gamma)/(de_dT+gamma*(1+canop_res/atm_res));
       evap=Fcan*(1.0-alpha)*PET*rr;             //[mm/d]
       
       // divide up evaporation based on root distribution
@@ -508,9 +508,8 @@ void CmvSoilEvap::GetRatesOfChange (const double      *state_vars,
         f4=max(0.0,min((avail_moist[m]-sat_wilt[m])/(field[m]-sat_wilt[m]),1.0));
 
         if(f4 > 0.0){
-          rc=1.0/(f4*canop_cond);         //[s/mm];
-          rr=(de_dT+gamma)/(de_dT+gamma*(1+rc/ra));
-          //rr=ra/(ra+rc);
+          canop_res=1.0/(f4*canop_cond);         //[s/mm];
+          rr=(de_dT+gamma)/(de_dT+gamma*(1+canop_res/atm_res));
           rates[q] = Fcan*(1.0-alpha)*root_frac[m]*PET*rr; //TODO: does root_frac make sense here?
         }
         else rates[q] = 0.0;
@@ -652,8 +651,7 @@ void CmvSoilEvap::GetRatesOfChange (const double      *state_vars,
     // Routine to compute evaporation from top soil layer based on the
     // assumption that evaporation is at the potential for the area which
     // is saturated, and at some percentage of the potential for the area
-    // which is partially saturated. Intended to be combined with INF_VIC_ARNO.
-    // Soil evaporation only occurs in areas a bare soil.
+    // which is partially saturated.
     
     //TODO - should soil evaporation by scaled by impermeable area?
     
@@ -661,9 +659,9 @@ void CmvSoilEvap::GetRatesOfChange (const double      *state_vars,
     double stor    =state_vars[iFrom[0]]+state_vars[iFrom[1]];
     double max_stor=pHRU->GetSoilCapacity(0);
     double b_infilt=pHRU->GetSoilProps(0)->VIC_b_exp; //ARNO/VIC b exponent for runoff [-]
-    double Fcan    =pHRU->GetSurfaceProps()->forest_coverage;
     double Asat, max_infil;
-    double ratio, tmp, tmpsum, dummy, beta_asp;
+    double ratio,tmp,tmpsum,dummy,beta_asp,resis_fact;
+    double ras=0.0;  // Air resistance between soil surface and canopy height
 
     max_infil = (1.0 + b_infilt) * max_stor;
     if(b_infilt == -1.0)
@@ -674,13 +672,21 @@ void CmvSoilEvap::GetRatesOfChange (const double      *state_vars,
       tmp = max_infil*(1.0 - ratio);
     }
     
+    // Update below-canopy atmospheric resistance if Penman-Monteith
+    // Ref Lhomme and Montes (2014)
     if(Options.evaporation==PET_PENMAN_MONTEITH){
-      // TODO - adjust atmospheric resistance to reflect conditions at
-      //        the ground surface
+      double omega=WIND_EXTINCT; 
+      double veg_height=pHRU->GetVegetationProps()->max_height;
+      double Kzh=wind*pow(VON_KARMAN,2)*(veg_height-zero_pl)/log((ref_ht-zero_pl)/rough); //eddy diffusivity at canopy height
+      ras=veg_height*exp(omega)/omega/Kzh*(exp(-omega*soil_rough/ref_ht)-exp(-omega*(zero_pl+rough)/veg_height))/MM_PER_METER;
+      resis_fact=atm_res/(atm_res+ras);
+    } else {
+      resis_fact=1.0;
     }
     
-    if(tmp >= max_infil)
-      rates[0]=(1.0-Fcan)*PET;
+    // Calculate soil moisture resistance
+    if(tmp >= max_infil)  //evaporation at potential rate
+      beta_asp=1.0;
     else {
       //  Compute As. 'As' is % area saturated, '1-As' is % area that is unsaturated.
       Asat = 1.0 - pow(ratio,b_infilt);
@@ -693,9 +699,9 @@ void CmvSoilEvap::GetRatesOfChange (const double      *state_vars,
         dummy += b_infilt * tmpsum / (b_infilt + num_term);
       }
       beta_asp = Asat+(1.0-Asat)*(1.0-ratio)*dummy;
-      rates[0]=(1.0-Fcan)*PET*beta_asp;
     }
     
+    rates[0]=PET*(Fcan*resis_fact+(1.0-Fcan))*beta_asp;
     PETused=rates[0];
   }
   //------------------------------------------------------------------
