@@ -121,6 +121,13 @@ private:/*------------------------------------------------------*/
                                   const time_struct &tt,
                                   double            *rates) const;
 
+  void EvaporationRootFraction  (const double      &PET,
+                                 const double      *state_vars,
+                                 const CHydroUnit  *pHRU,
+                                 const optStruct   &Options,
+                                 const time_struct &tt,
+                                 double            *rates) const;
+
 public:/*-------------------------------------------------------*/
   //Constructors/destructors:
   CmvSoilEvap(soilevap_type se_type, CModelABC *pModel);
