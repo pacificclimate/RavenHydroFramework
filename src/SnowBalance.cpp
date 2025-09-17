@@ -916,7 +916,7 @@ void CmvSnowBalance::TwoLayerBalance(const double   *state_vars,
 
   //INTERNAL
   //------------------------------------------------------------------------
-  double ccSnowFall;
+  double ccSnowFall, CcSurf_we;
 
   //reset cumulative melt to zero in October
   //------------------------------------------------------------------------
@@ -945,7 +945,6 @@ void CmvSnowBalance::TwoLayerBalance(const double   *state_vars,
   //this also initializes the cold content with the first snow fall
   //------------------------------------------------------------------------
   ccSnowFall = HCP_ICE / MM_PER_METER * newSnow * max(-Ta, 0.0);
-
   //[MJ/m2] = [MJ/m3/K]  * [m/mm]      *  [mm]  *  [K]
 
   //distribute fresh snowfall
@@ -972,53 +971,67 @@ void CmvSnowBalance::TwoLayerBalance(const double   *state_vars,
   //------------------------------------------------------------------------
   SlwcSurf += rainthru;
 
-  //add CC to Mf to get total energy available for melt/freeze
-  // converts cold content to equivalent melt amount
-  //------------------------------------------------------------------------
-  Mf -= CcSurf / LH_FUSION / DENSITY_ICE*MM_PER_METER; // [MJ/m2] / [MJ/kg] /[kg/m3]*[mm/m]= [mm]
-
-  //snowpack cooling or warming
+  //update snowpack energy
   //engergy exchange occurs only between snow surface layer and atmosphere
   //snow surface layer and snow pack layer only exchange liquid water
+  //[MAS]: added code to deal with circumstance when surface energy balance is
+  //positive but surface snow layer has cold content (i.e. cold content is reduced
+  //but melt may not occur - snowpack ripening). This prevents cold content from
+  //reaching excessively high values.
   //------------------------------------------------------------------------
   //snowpack cooling or warming
   //------------------------------------------------------------------------
-  if (Mf <= 0.0)  //   snow cooling
+  if (Mf < 0.0)  // surface energy balance is negative
   {
     double posMf = -Mf;
-    if (posMf < SlwcSurf)//refreeze part of liquid water
+    if (posMf < SlwcSurf)  // refreeze part of liquid water
     {
-      meltSurf += Mf;   // note that Mf is negative
-      CcSurf = 0.0;
+      meltSurf += Mf;
+      CcSurf   += 0.0;
     }
-    else// refreeze all liquid water and increase cold content
+    else                  // refreeze all liquid water and increase cold content
     {
-      posMf    -= SlwcSurf;
       meltSurf -= SlwcSurf;
-      CcSurf = posMf * LH_FUSION  * DENSITY_WATER / MM_PER_METER; // leftover energy is new CC ; this has to be water density since posMF is mmSWE
-
+      
+      // [MAS]: As ground heat flux is ignored, very thin snowpacks can accumulate too much cold content,
+      // resulting in unrealistically low snow surface temperatures. The following hack (which was already
+      // present in the code to address a different issue) seems to alleviate the problem
       if (SweSurf < 50.0) //dont cool below gruTa when Swe is below 50 mm (need this for stable run, otherwise CC and Tsnow start to fluctuate...)
       {
         CcSurf = min(CcSurf, -Ta * (SweSurf/MM_PER_METER) * HCP_ICE);
         CcSurf = max(CcSurf, 0.0);
       }
+      else
+      {
+        CcSurf   += (posMf-SlwcSurf) * LH_FUSION  * DENSITY_WATER / MM_PER_METER;
+      }
     }
   }
-  else // snow warming (_Mf > 0)
+  else        // surface energy balance is positive
   {
-    CcSurf = 0.0; // can't have CC when snow is melting
-
-    if (SweSurf < Mf) // All snow melts
+    CcSurf_we = CcSurf / LH_FUSION / DENSITY_ICE * MM_PER_METER;
+    if (Mf < CcSurf_we)  // reduce cold content
     {
-      meltSurf += SweSurf;
-      gross_melt+=SweSurf;
+      meltSurf += 0.0;
+      CcSurf   -= Mf * LH_FUSION  * DENSITY_WATER / MM_PER_METER;
     }
-    else
+    else                // reduce cold content and melt snow
     {
-      meltSurf  += Mf;
-      gross_melt +=Mf;
+      Mf -= CcSurf_we;
+      CcSurf = 0.0;
+      if (SweSurf < Mf) // All snow melts
+      {
+        meltSurf   += SweSurf;
+        gross_melt +=SweSurf;
+      }
+      else
+      {
+        meltSurf   += Mf;
+        gross_melt +=Mf;
+      }
     }
   }
+  
   SweSurf -= meltSurf; //new SWE after melt/freeze
   SlwcSurf+= meltSurf; //new Slwc after melt/freeze
 
@@ -1066,9 +1079,6 @@ void CmvSnowBalance::TwoLayerBalance(const double   *state_vars,
 
   //Surface snow Temp - assumes an isothermal snow surface layer
   snowT = -CcSurf / (HCP_ICE* max(1.0, SweSurf)/MM_PER_METER);
-  snowT *= 0.2; // NS: There's no physical basis for this, but snowT was always way too low.
-  //            //     This correction puts snowT close to the air temperature.
-  //            // \todo [bug] - identify source of this issue.
 
   cum_melt += gross_melt;
 

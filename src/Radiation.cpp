@@ -40,6 +40,9 @@ double CRadiation::EstimateShortwaveRadiation(CModel* pModel,
   }
   //--------------------------------------------------------
   case(SW_RAD_DATA):
+  {
+    return F->SW_radia;
+  }
   //--------------------------------------------------------
   case(SW_RAD_DEFAULT):
   {
@@ -213,19 +216,18 @@ double CRadiation::EstimateLongwaveRadiation(const int iSnow,
     double emissivity=0.99;
     double forest_cover=pHRU->GetSurfaceProps()->forest_coverage;
     double Tair =F->temp_ave+ZERO_CELSIUS;  //[K]
-    double Tsurf=F->temp_ave+ZERO_CELSIUS;  //[K] //\todo better way to do this.
-    //double Tsurf=pHRU->GetSurfaceTemperature()+ZERO_CELSIUS;//[K] (not yet functional)
+    double Tsurf=pHRU->GetSurfaceTemperature()+ZERO_CELSIUS;//[K]
 
     double ea   =F->rel_humidity*GetSaturatedVaporPressure(F->temp_ave);
-
-    double emiss_eff=1.72*pow(ea/Tair,1/7.0);/// effective clear sky emmisivity \ref Brutsaert 1975, via Dingman clear sky emmissivity
-
+    double emiss_eff=1.72*pow(ea/Tair,1/7.0);/// effective clear sky emissivity \ref Brutsaert 1975, via Dingman clear sky emissivity
     double eps_at   =emiss_eff*(1.0+0.22*F->cloud_cover*F->cloud_cover);
-
     eps_at=(1-forest_cover)*eps_at+(forest_cover)*1.0; //treats forest as blackbody - neglects sky view factor
 
     if (Options->LW_incoming==LW_INC_DEFAULT) { //now, DEFAULT==DINGMAN
       LW_incoming=STEFAN_BOLTZ*eps_at*pow(Tair,4);
+    } else if (Options->LW_incoming==LW_INC_DATA) { //Data-based LW_INC does not typically consider effect of vegetation
+      LW_incoming *= (1-forest_cover);
+      LW_incoming += STEFAN_BOLTZ*forest_cover*pow(Tair,4);
     }
     return LW_incoming-STEFAN_BOLTZ*emissivity*pow(Tsurf,4);
   }
