@@ -380,13 +380,16 @@ double CModel::EstimatePET(const force_struct &F,
     double vap_rough_ht,atmos_cond;
     double ref_ht;
 
-    //can_cond=pHRU->GetVegVarProps()->canopy_conductance;
-    zero_pl =pHRU->GetVegVarProps()->zero_pln_disp;
-    rough   =pHRU->GetVegVarProps()->roughness;
-    ref_ht  =pHRU->GetVegVarProps()->reference_height; //default veght+2.0 m
-
+    ref_ht  =pHRU->GetVegVarProps()->reference_height; //veg_height + Z_REF_ADJUST
+    if (open_water){
+      zero_pl = 0.0;
+      rough   = 0.0005;
+    }
+    else {
+      zero_pl = pHRU->GetVegVarProps()->zero_pln_disp;
+      rough   = pHRU->GetVegVarProps()->roughness;
+    }
     if(wind_measurement_ht>ref_ht){ref_ht=wind_measurement_ht;} //correction if real measurement height data is available
-
     vap_rough_ht=0.1*rough;//=1.0*rough for dingman
 
     atmos_cond=CalcAtmosphericConductance(F.wind_vel,ref_ht,zero_pl,rough,vap_rough_ht);

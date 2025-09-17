@@ -493,7 +493,8 @@ void CmvSoilEvap::GetRatesOfChange (const double      *state_vars,
     // Routine to compute evaporation from top soil layer based on the
     // assumption that evaporation is at the potential for the area which
     // is saturated, and at some percentage of the potential for the area
-    // which is partially saturated.
+    // which is partially saturated. Evaporation does not occur in areas
+    // covered by snow.
     
     //TODO - should soil evaporation by scaled by impermeable area?
     
@@ -506,6 +507,7 @@ void CmvSoilEvap::GetRatesOfChange (const double      *state_vars,
     double ref_ht   = pHRU->GetVegVarProps()->reference_height;
     double zero_pl  = pHRU->GetVegVarProps()->zero_pln_disp;
     double rough    = pHRU->GetVegVarProps()->roughness;
+    double snwcvr   = pHRU->GetSnowCover();
     double vap_rough_ht = 0.1*rough;
     double soil_rough = 0.01; //TODO: Set as global parameter
     double Asat, max_infil;
@@ -552,7 +554,7 @@ void CmvSoilEvap::GetRatesOfChange (const double      *state_vars,
       beta_asp = Asat+(1.0-Asat)*(1.0-ratio)*dummy;
     }
     
-    rates[0]=PET*(Fcan*resis_fact+(1.0-Fcan))*beta_asp;
+    rates[0]=PET*(Fcan*resis_fact+(1.0-Fcan))*beta_asp*(1-snwcvr);
     PETused=rates[0];
   }
   //------------------------------------------------------------------

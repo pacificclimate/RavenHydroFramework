@@ -1107,7 +1107,7 @@ double CalcAtmosphericConductance(const double &wind_vel,     //[m/d]
                                   const double &vap_rough_ht) //[m]
 {
   double atmos_cond;
-  if (zero_pl==0.0){return 0.0;}
+  //if (zero_pl==0.0){return 0.0;}  //TODO - Why?
 
   //'6.25' from Dingman equation 7-49 is roughly 1/VK^2 (~6)
   atmos_cond=(wind_vel*MM_PER_METER*pow(VON_KARMAN,2));
