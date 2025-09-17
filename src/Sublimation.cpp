@@ -151,23 +151,40 @@ double  SublimationRate  (const double      *state_vars,
   { ///bulk aerodynamix flux formulation described in Hock & Holmgren [2005]
     //Hock, R., & Holmgren, B. (2005). A distributed surface energy-balance model for complex topography and
     //its application to Storglaciaren, Sweden. Journal of Glaciology, 51(172), 25-36. doi:10.3189/172756505781829566
-    double air_pres=pHRU->GetForcingFunctions()->air_pres; //air pressure [kPa]
-    double air_dens=pHRU->GetForcingFunctions()->air_dens;
-    double Tsnow   =pHRU->GetSnowTemperature();
+    double air_pres    = pHRU->GetForcingFunctions()->air_pres; //air pressure [kPa]
+    double air_dens    = pHRU->GetForcingFunctions()->air_dens;
+    double Tsnow       = pHRU->GetSnowTemperature();
+    double wind_ref_ht = pHRU->GetVegVarProps()->reference_height;
+    double veg_height  = pHRU->GetVegetationProps()->max_height;
+    double zero_pl     = pHRU->GetVegVarProps()->zero_pln_disp;
+    double veg_rough   = pHRU->GetVegVarProps()->roughness;
+    double z_ref=2.0;          //reference height [m]
+    double z0   =0.001;        //aerodynamic roughness length for snow [m]
+    double z0e  =0.001;        //roughness length for temperature[m]
 
     double ea   =GetSaturatedVaporPressure(Ta   )*rel_hum;  //Vapour pressure of air[kPa]
     double es   =GetSaturatedVaporPressure(Tsnow)*1.0;      //snow surface vapour pressure(assume saturated)[kPa]
+    double ustar, wind_vel_h, wind_vel_s;
 
-    double z_ref=2.0;            //reference height [m]
-    double z0   =0.00005;        //aerodynamic roughness length for snow [m]
-    double z0e  =0.00005;        //roughness length for temperature[m]
+    // Estimate wind velocity at snow surface; Ref Bonan (2008)
+    if (veg_height > z_ref)
+    { //logarithmic profile from wind reference height to vegetation height, and
+      //exponential profile from vegetation height to snow reference height
+      ustar = VON_KARMAN*wind_vel/log((wind_ref_ht-zero_pl)/veg_rough);
+      wind_vel_h = ustar/VON_KARMAN*log((veg_height-zero_pl)/veg_rough);
+      wind_vel_s = wind_vel_h * exp(-WIND_EXTINCT*(1-z_ref/veg_height));
+    } else
+    { //logarithmic profile from wind reference height to snow reference height
+      ustar = VON_KARMAN*wind_vel/log(wind_ref_ht/z0);
+      wind_vel_s = ustar/VON_KARMAN*log(z_ref/z0);
+    }
 
     //Calculate transfer coefficient for latent heat--> Assumes neutral conditions; probably ok for melt.
     //Flag to chat about: could add Richardson Numbers to this; Monin-Ohbukhov doesn't work great high relief due to gravity winds
     double C_E = (VON_KARMAN*VON_KARMAN) / (log(z_ref / z0) * log(z_ref / z0e));
 
     //Calculate Latent Heat Flux,then convert units to get sublimation rate
-    double Q_E = air_dens * LH_SUBLIM * C_E * wind_vel * ((AIR_H20_MW_RAT * (es - ea)) / air_pres)*SEC_PER_DAY; //MJ/m2/d
+    double Q_E = air_dens * LH_SUBLIM * C_E * wind_vel_s * ((AIR_H20_MW_RAT * (es - ea)) / air_pres)*SEC_PER_DAY; //MJ/m2/d
     return  Q_E / (LH_SUBLIM * DENSITY_WATER)*MM_PER_METER; //[mm/d]
   }
   //-----------------------------------------------------------------
