@@ -840,7 +840,15 @@ void CmvSoilEvap::EvaporationRootFraction(const double      &PET,
   double canop_cap    = Fcan*pHRU->GetVegVarProps()->capacity;
   double canop_stor   = min(max(state_vars[pModel->GetStateVarIndex(CANOPY)],0.0),canop_cap); //correct for potentially invalid storage
   double alpha        = pow(canop_stor/canop_cap, 2.0/3.0);
-   
+  
+  //No transpiration absent vegetation cover or roots
+  if(canop_cond==0.0 || beta<0.0 || Fcan==0.0){
+    for(q=0;q<_nConnections-1;q++) {
+      rates[q]=0.0;
+    }
+    return;
+  }
+  
   // Get soil parameters for each soil layer
   for (m=0;m<nSoilLayers;m++)
   {
@@ -862,10 +870,10 @@ void CmvSoilEvap::EvaporationRootFraction(const double      &PET,
   {
     zrel[m]=depth[m]/max_depth;
     if(m==0){
-      root_frac[m]=1-pow(1.0-zrel[m],beta);
+      root_frac[m]=1-pow(1.0-zrel[m],beta+1.0);
     }
     else {
-      root_frac[m]=pow(1.0-zrel[m-1],beta)-pow(1.0-zrel[m],beta);
+      root_frac[m]=pow(1.0-zrel[m-1],beta+1.0)-pow(1.0-zrel[m],beta+1.0);
     }
     if(root_frac[m] > 0.0) {
       avail_moist[m]=state_vars[iFrom[m]]/cap[m];
@@ -880,7 +888,7 @@ void CmvSoilEvap::EvaporationRootFraction(const double      &PET,
   moist2=state_vars[iFrom[m]]/cap[m];
   avail_moist[m]=moist2;
   zrel[m]=depth[m]/max_depth;
-  root_frac[m]=pow(1.0-zrel[m-1],beta)-pow(1.0-zrel[m],beta);
+  root_frac[m]=pow(1.0-zrel[m-1],beta+1.0)-pow(1.0-zrel[m],beta+1.0);
 
   /** Calculate transpiration from each soil layer **/
 
@@ -903,7 +911,7 @@ void CmvSoilEvap::EvaporationRootFraction(const double      &PET,
     //Scaling factor for PET based on updated canopy resistance
     rr=(de_dT+gamma)/(de_dT+gamma*(1+canop_res/atm_res));
     evap=Fcan*(1.0-alpha)*PET*rr;             //[mm/d]
-      
+    
     // divide up evaporation based on root distribution
     root_sum=1.0;
     spare_evap=0.0;

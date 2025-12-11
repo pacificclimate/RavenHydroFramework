@@ -112,8 +112,8 @@ double CModel::EstimatePotentialMelt(const force_struct *F,
     double veg_height  = pHRU->GetVegetationProps()->max_height;
     double zero_pl     = pHRU->GetVegVarProps()->zero_pln_disp;
     double veg_rough   = pHRU->GetVegVarProps()->roughness;
-    double snow_ref_ht = 2.0;    // Nominal height for adjusting wind velocity above snowpack [m]; TODO use snow depth
-    double snow_rough  = 0.002; // [m] // TODO access global parameter 'snow_roughness'
+    double snow_ref_ht = 2.0;      // Nominal height for adjusting wind velocity above snowpack [m]; TODO use snow depth
+    double snow_rough  = 0.001;    // [m] // TODO access global parameter 'snow_roughness'
     double surf_temp = pHRU->GetSnowTemperature();
     double ustar, wind_vel_h, wind_vel_s;
     
@@ -136,13 +136,9 @@ double CModel::EstimatePotentialMelt(const force_struct *F,
     double LH= GetLatentHeatSnow  (air_pres,air_temp,surf_temp,rel_humid,wind_vel_s,snow_ref_ht,snow_rough); //[MJ/m2/d]
     double R = GetRainHeatInput   (surf_temp,air_temp,rainfall ,rel_humid); //[MJ/m2/d]
 
-    //cout << endl;
-    //cout << " rainfall: " << rainfall << "; tas: " << air_temp << "; press: " << air_pres << "; rh: " << rel_humid << "; wind: " << wind_vel << endl;
-    //cout << " wind_vel: " << wind_vel << "; wind_vel_h: " << wind_vel_h << "; wind_vel_s: " << wind_vel_s  << "; Tsurf: " << surf_temp << endl;
-    //cout << " K: " << K << "; L: " << L << "; H: " << H << "; LH: " << LH << "; R: " << R << endl;
-
     double S = K + L + H + LH + R;                //total heat input rate [MJ/m2/d]
     S*=(MM_PER_METER/DENSITY_WATER/LH_FUSION);    //[MJ/m2/d-->mm/d]
+    
     return S;
   }
   //----------------------------------------------------------
