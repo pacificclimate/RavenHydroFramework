@@ -47,6 +47,15 @@ LDLIBS   += -L/usr/local -lnetcdf
 # OPTION 4) uncomment for M1 and newer MacOS
 #CXXFLAGS += -Dfinite=isfinite
 
+# OPTION 5) uncomment for OpenMP
+CXXFLAGS += -fopenmp
+
+# OPTION 6) Profiling with gprof tool
+#CXXFLAGS += -pg
+
+# OPTION 7) Profiling with perf tool
+CXXFLAGS += -g
+
 srcfiles := $(shell ls *.cpp)
 objects  := $(patsubst %.cpp, %.o, $(srcfiles))
 

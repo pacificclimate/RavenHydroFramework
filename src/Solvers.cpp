@@ -184,11 +184,16 @@ void MassEnergyBalance( CModel            *pModel,
   // -order is critical!
   if (Options.sol_method==ORDERED_SERIES)
   {
+    //sv_type typ;
+#pragma omp parallel for \
+  default(shared) \
+  firstprivate(iFrom,iTo,rates_of_change,Options,tt) \
+  private(j,q,qs,nConnections,pHRU) \
+  schedule(static,1)
     for (k=0;k<nHRUs;k++)
     {
       pHRU=pModel->GetHydroUnit(k);
       pModel->ApplyLocalParamOverrrides(k, false);
-
       if(pHRU->IsEnabled())
       {
         qs=0;
@@ -205,15 +210,20 @@ void MassEnergyBalance( CModel            *pModel,
             for(q=0;q<nConnections;q++)//each process may have multiple connections
             {
               sv_type typ=pModel->GetStateVarType(iFrom[q]);
+              //typ=pModel->GetStateVarType(iFrom[q]);
               if(iTo[q]!=iFrom[q]) {
+#pragma omp atomic update
                 aPhinew[k][iFrom[q]]-=rates_of_change[q]*tstep;//mass/energy balance maintained
+#pragma omp atomic update
                 aPhinew[k][iTo  [q]]+=rates_of_change[q]*tstep;//change is an exchange of energy or mass, which must be preserved
               }
               else if (CStateVariable::IsWaterStorage(typ) && (typ!=CONVOLUTION)){ //or IsWaterStorage(typ,false)
                 rates_of_change[q]=0.0;
+#pragma omp atomic update
                 aPhinew[k][iTo  [q]]+=0.0; //likely from redirect - water moves back to itself
               }
               else {
+#pragma omp atomic update
                 aPhinew[k][iTo  [q]]+=rates_of_change[q]*tstep;//for state vars that are not storage compartments
               }
               pModel->IncrementBalance(qs,k,rates_of_change[q]*tstep);   //this is only this easy for Euler/Ordered!
