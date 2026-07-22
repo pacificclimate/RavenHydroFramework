@@ -219,6 +219,11 @@ protected:
   double               *_aMout_res;  ///< array storing reservoir mass outflow [mg/d] or heat loss [MJ/d] [size: nSubBasins]
   double          *_aMout_res_last;  ///< array storing reservoir mass outflow [mg/d] or enthalpy outflow  [MJ/d] at start of timestep  [size: nSubBasins]
   double               *_aMresRain;  ///< array storing reservoir rain inputs [mg/d] or enthalpy input [MJ/d] [size: nSubBasins]
+  
+  double               *_aMres_epo;  ///< array used for storing epolimnion layer masses [mg] or enthalpy [MJ] [size: nSubBasins]
+  double          *_aMres_epo_last;  ///< array used for storing epolimnion layer masses [mg] at start of timestep [size: nSubBasins]
+  double               *_aMres_hyp;  ///< array used for storing hypolimnion layer masses [mg] or enthalpy [MJ] [size: nSubBasins]
+  double          *_aMres_hyp_last;  ///< array used for storing hypolimnion layer masses [mg] at start of timestep [size: nSubBasins]
 
   // Mass balance tracking variables
   double         *_channel_storage;  ///< array storing channel storage [mg] or [MJ] [size: nSubBasins]
@@ -319,7 +324,7 @@ public:/*-------------------------------------------------------*/
   virtual void   PrepareForRouting        (const int p);
           void   RouteMass                (const int p,      double *aMoutnew,double &Mlat_new,double &ResMass,double &ResSedMass, double &SourceTransfer, const optStruct &Options,const time_struct &tt) const;
   virtual void   RouteMassInReservoir     (const int p,const double *aMoutnew,                 double &ResMass,double &ResSedMass, double &SourceTransfer, const optStruct &Options,const time_struct &tt) const;
-          void   UpdateMassOutflows       (const int p,const double *aMoutnew,const double &Mlat_new,const double &ResMass,const double &ResSedMass, double &MassOutflow,
+  virtual void   UpdateMassOutflows       (const int p,const double *aMoutnew,const double &Mlat_new,const double &ResMass,const double &ResSedMass, double &MassOutflow,
                                            const optStruct &Options,const time_struct &tt,const bool initialize);
 
   virtual void   UpdateInitialConditions     (const optStruct &Options);

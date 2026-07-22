@@ -60,8 +60,8 @@ public:/*-------------------------------------------------------*/
   double GetWaterTemperature     (const double *state_vars, const int iWater) const;
 
   double GetEnergyLossesInTransit(const int p,double &Q_sens,double &Q_GW) const;
+  double GetEnergyLossesFromLake (const int p,double &Q_sens,double &Q_cond,double &Q_lat,double &Q_rad_in,double &Q_lw_in, double &Q_lw_out, double &Q_rain, double &Q_adv, double &kdiff) const;
   double GetEnergyLossesFromReach(const int p,double &Q_sens,double &Q_cond,double &Q_lat,double &Q_GW,double &Q_rad_in,double &Q_lw_in, double &Q_lw_out,double &Q_lateral, double &Q_fric, double &Tave) const;
-  double GetEnergyLossesFromLake (const int p,double &Q_sens,double &Q_cond,double &Q_lat,double &Q_rad_in,double &Q_lw_in, double &Q_lw_out, double &Q_rain) const;
 
   double GetOutflowIceFraction   (const int p) const;
   double GetAvgLatentHeatFlux    () const;
@@ -94,6 +94,8 @@ public:/*-------------------------------------------------------*/
                                   const double* aMoutnew, double& ResMass, double& ResSedMass, double &SourceTransfer,
                                   const optStruct   &Options,
                                   const time_struct &tt) const;
+  void   UpdateMassOutflows      (const int p,const double *aMoutnew,const double &Mlat_new,const double &ResMass,const double &ResSedMass, double &MassOutflow,
+                                  const optStruct &Options,const time_struct &tt,const bool initialize);
 
   void   WriteOutputFileHeaders      (const optStruct& Options);
   void   WriteMinorOutput            (const optStruct& Options,const time_struct& tt);
