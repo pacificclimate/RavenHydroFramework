@@ -109,15 +109,8 @@ private:/*-------------------------------------------------------*/
   double       _stage_last;          ///< stage at beginning of current time step [m]
   double       _Qout;                ///< outflow corresponding to current stage [m3/s]
   double       _Qout_last;           ///< outflow at beginning of current time step [m3/s]
-<<<<<<< HEAD
-=======
   double       _Q_dn_old;            ///< downward flow between layers at beginning of current time step [m3/d]
   double       _Q_up_old;            ///< upward flow between layers at beginning of current time step [m3/d]
-  double       _MB_losses;           ///< losses over current time step [m3]
-  double       _AET;                 ///< losses through AET only [m3]
-  double       _Precip;              ///< gains through precipitation [m3]
-  double       _GW_seepage;          ///< losses to GW only [m3] (negative for GW gains)
->>>>>>> v506_pcic
   double      *_aQstruct;            ///< array of flows from control structures at end of time step [m3/s]
   double      *_aQstruct_last;       ///< array of flows from control structures at start of time step [m3/s]
   double      *_aQdelivered;         ///< amount of water demand delivered for each demand [m3/s] (for management optimization)
